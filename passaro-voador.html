@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Pássaro Voador · Fliperama Neon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fundo: #0b0820; --painel: #151033; --borda: #2e2766; --texto: #f1eeff; --suave: #a39fd0;
+    --ciano: #00f0ff; --rosa: #ff2bd6; --amarelo: #ffe600;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% 0%, #2a1460, var(--fundo) 65%);
+    color: var(--texto); font-family: "Segoe UI", Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 16px 24px;
+    user-select: none; -webkit-user-select: none; touch-action: manipulation;
+  }
+  .topo { width: 100%; max-width: 420px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .voltar { color: var(--suave); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--borda); padding: 6px 10px; border-radius: 8px; }
+  .voltar:hover { color: var(--ciano); border-color: var(--ciano); }
+  h1 { font-family: "Press Start 2P", monospace; font-size: 0.85rem; color: var(--amarelo); text-shadow: 0 0 8px var(--amarelo); }
+  .placar { display: flex; gap: 12px; font-size: 0.75rem; color: var(--suave); }
+  .placar b { color: var(--amarelo); font-size: 1rem; }
+  main { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; }
+  .area { position: relative; border: 2px solid var(--amarelo); border-radius: 10px; box-shadow: 0 0 18px rgba(255, 230, 0, 0.35); background: #06041a; line-height: 0; cursor: pointer; }
+  canvas { display: block; width: min(92vw, 360px, 48vh); height: auto; border-radius: 8px; }
+  .aviso { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(6, 4, 26, 0.78); text-align: center; padding: 16px; line-height: 1.4; border-radius: 8px; }
+  .aviso.escondido { display: none; }
+  .aviso h2 { font-family: "Press Start 2P", monospace; font-size: 0.95rem; color: var(--rosa); text-shadow: 0 0 10px var(--rosa); }
+  .aviso p { color: var(--suave); font-size: 0.9rem; }
+  .botao { background: transparent; color: var(--amarelo); border: 2px solid var(--amarelo); border-radius: 8px; padding: 10px 22px; font-weight: 800; font-size: 1rem; cursor: pointer; box-shadow: 0 0 10px rgba(255, 230, 0, 0.35); }
+  .dica { font-size: 0.75rem; color: var(--suave); text-align: center; }
+</style>
+</head>
+<body>
+<header class="topo">
+  <a href="fliperama-neon.html" class="voltar">← Fliperama</a>
+  <h1>PÁSSARO VOADOR</h1>
+  <div class="placar"><span>RECORDE <b id="recorde">0</b></span></div>
+</header>
+
+<main>
+  <div class="area" id="area">
+    <canvas id="tela" width="360" height="540"></canvas>
+    <div class="aviso" id="aviso">
+      <h2 id="avisoTitulo">PÁSSARO VOADOR</h2>
+      <p id="avisoTexto">Toque, clique ou aperte Espaço para voar.<br>Passe entre os canos!</p>
+      <button class="botao" id="botaoJogar">JOGAR</button>
+    </div>
+  </div>
+  <p class="dica">Clique, toque na tela, Espaço ou ↑ para bater as asas</p>
+</main>
+
+<script>
+  const tela = document.getElementById("tela");
+  const ctx = tela.getContext("2d");
+  const L = tela.width, A = tela.height, CHAO = A - 60;
+  const GRAVIDADE = 1500, PULO = -430, VAO = 150, LARG_CANO = 60, VEL = 150, ESPACO = 210;
+  const CHAVE = "fliperama_passaro";
+
+  let passaro, canos, pontos, estado = "parado", ultimo = 0, deslocChao = 0;
+  let recorde = ler();
+  document.getElementById("recorde").textContent = recorde;
+
+  function ler() { try { return Number(localStorage.getItem(CHAVE)) || 0; } catch (e) { return 0; } }
+  function salvar(v) { try { localStorage.setItem(CHAVE, v); } catch (e) {} }
+
+  let audio = null;
+  function bip(freq, dur, tipo = "square", vol = 0.05, freqFim) {
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = tipo; o.frequency.setValueAtTime(freq, audio.currentTime);
+      if (freqFim) o.frequency.exponentialRampToValueAtTime(freqFim, audio.currentTime + dur);
+      g.gain.setValueAtTime(vol, audio.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + dur);
+      o.connect(g).connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + dur);
+    } catch (e) {}
+  }
+
+  function preparar() {
+    passaro = { x: 90, y: A / 2 - 40, vy: 0, raio: 14 };
+    canos = [];
+    pontos = 0;
+    deslocChao = 0;
+  }
+
+  function iniciar() {
+    preparar();
+    estado = "jogando";
+    for (let i = 0; i < 3; i++) novoCano(L + 80 + i * ESPACO);
+    document.getElementById("aviso").classList.add("escondido");
+    voar();
+  }
+
+  function novoCano(x) {
+    const topo = 60 + Math.random() * (CHAO - VAO - 120);
+    canos.push({ x, topo, contou: false });
+  }
+
+  function voar() {
+    if (estado !== "jogando") return;
+    passaro.vy = PULO;
+    bip(600, 0.12, "triangle", 0.05, 900);
+  }
+
+  function laco(agora) {
+    const dt = Math.min(0.033, (agora - ultimo) / 1000 || 0);
+    ultimo = agora;
+    if (estado === "jogando") atualizar(dt);
+    else if (estado === "parado") passaro.y = A / 2 - 40 + Math.sin(agora / 300) * 8; // flutuando na tela inicial
+    desenhar();
+    requestAnimationFrame(laco);
+  }
+
+  function atualizar(dt) {
+    passaro.vy += GRAVIDADE * dt;
+    passaro.y += passaro.vy * dt;
+    deslocChao = (deslocChao + VEL * dt) % 24;
+
+    canos.forEach(c => c.x -= VEL * dt);
+    if (canos[0].x < -LARG_CANO) {
+      canos.shift();
+      novoCano(canos[canos.length - 1].x + ESPACO);
+    }
+
+    for (const c of canos) {
+      if (!c.contou && c.x + LARG_CANO < passaro.x) {
+        c.contou = true;
+        pontos++;
+        bip(1000, 0.08); bip(1500, 0.1);
+      }
+      // colisão círculo x retângulo (cano de cima e de baixo)
+      const bate = (rx, ry, rw, rh) => {
+        const px = Math.max(rx, Math.min(passaro.x, rx + rw));
+        const py = Math.max(ry, Math.min(passaro.y, ry + rh));
+        return (passaro.x - px) ** 2 + (passaro.y - py) ** 2 < (passaro.raio - 2) ** 2;
+      };
+      if (bate(c.x, 0, LARG_CANO, c.topo) || bate(c.x, c.topo + VAO, LARG_CANO, CHAO - c.topo - VAO)) return morrer();
+    }
+    if (passaro.y + passaro.raio > CHAO) { passaro.y = CHAO - passaro.raio; return morrer(); }
+    if (passaro.y < passaro.raio) { passaro.y = passaro.raio; passaro.vy = 0; }
+  }
+
+  function morrer() {
+    estado = "fim";
+    bip(300, 0.4, "sawtooth", 0.07, 80);
+    let texto = `Você passou ${pontos} cano${pontos === 1 ? "" : "s"}.`;
+    if (pontos > recorde) {
+      recorde = pontos;
+      salvar(recorde);
+      document.getElementById("recorde").textContent = recorde;
+      texto = `NOVO RECORDE: ${pontos}! 🏆`;
+    }
+    setTimeout(() => {
+      document.getElementById("avisoTitulo").textContent = "BATEU!";
+      document.getElementById("avisoTexto").textContent = texto;
+      document.getElementById("botaoJogar").textContent = "JOGAR DE NOVO";
+      document.getElementById("aviso").classList.remove("escondido");
+    }, 500);
+  }
+
+  // estrelas fixas do fundo
+  const estrelas = Array.from({ length: 50 }, () => ({ x: Math.random() * L, y: Math.random() * (CHAO - 40), r: Math.random() * 1.5 + 0.3 }));
+
+  function desenhar() {
+    const g = ctx.createLinearGradient(0, 0, 0, CHAO);
+    g.addColorStop(0, "#120a3a");
+    g.addColorStop(1, "#3a1460");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, L, A);
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    estrelas.forEach(s => { ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill(); });
+
+    // canos neon
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = "#39ff88";
+    canos.forEach(c => {
+      ctx.fillStyle = "#1a7a46";
+      ctx.fillRect(c.x, 0, LARG_CANO, c.topo);
+      ctx.fillRect(c.x, c.topo + VAO, LARG_CANO, CHAO - c.topo - VAO);
+      ctx.fillStyle = "#39ff88";
+      ctx.fillRect(c.x - 4, c.topo - 20, LARG_CANO + 8, 20);
+      ctx.fillRect(c.x - 4, c.topo + VAO, LARG_CANO + 8, 20);
+    });
+    ctx.shadowBlur = 0;
+
+    // chão
+    ctx.fillStyle = "#1b1240";
+    ctx.fillRect(0, CHAO, L, A - CHAO);
+    ctx.fillStyle = "#ff2bd6";
+    ctx.fillRect(0, CHAO, L, 3);
+    ctx.fillStyle = "rgba(255,43,214,0.35)";
+    for (let x = -deslocChao; x < L; x += 24) ctx.fillRect(x, CHAO + 14, 12, 4);
+
+    // pássaro (inclina conforme sobe/desce)
+    ctx.save();
+    ctx.translate(passaro.x, passaro.y);
+    ctx.rotate(Math.max(-0.5, Math.min(1.2, passaro.vy / 600)));
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = "#ffe600";
+    ctx.fillStyle = "#ffe600";
+    ctx.beginPath(); ctx.arc(0, 0, passaro.raio, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#ffb000";
+    ctx.beginPath(); ctx.ellipse(-4, 3, 8, 5, -0.3, 0, Math.PI * 2); ctx.fill(); // asa
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(6, -5, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#111";
+    ctx.beginPath(); ctx.arc(7.5, -5, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ff6a00";
+    ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(21, 3); ctx.lineTo(11, 7); ctx.fill(); // bico
+    ctx.restore();
+
+    // pontos
+    if (estado !== "parado") {
+      ctx.font = "28px 'Press Start 2P', monospace";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#fff";
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = "#ff2bd6";
+      ctx.fillText(pontos, L / 2, 70);
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  function acao() {
+    if (estado === "jogando") voar();
+  }
+
+  document.getElementById("area").addEventListener("pointerdown", e => {
+    if (e.target.id === "botaoJogar") return;
+    acao();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.code === "Space" || e.code === "ArrowUp") {
+      e.preventDefault();
+      if (estado === "jogando") voar();
+      else if (estado === "parado" || !document.getElementById("aviso").classList.contains("escondido")) iniciar();
+    }
+  });
+  document.getElementById("botaoJogar").addEventListener("click", e => { iniciar(); e.currentTarget.blur(); });
+
+  preparar();
+  requestAnimationFrame(laco);
+</script>
+</body>
+</html>

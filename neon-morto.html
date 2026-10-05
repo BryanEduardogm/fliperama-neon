@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Morto · Fliperama Neon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root { --fundo: #000; --texto: #d8d0e8; --suave: #8a80a0; --vermelho: #ff2a4a; --neon: #ff2bd6; --ciano: #00f0ff; --amarelo: #ffe600; --verde: #39ff88; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; color: var(--texto); font-family: "VT323", monospace; font-size: 22px; user-select: none; }
+
+  /* o jogo é desenhado em baixa resolução e ampliado: visual pixelado retrô */
+  canvas#jogo { position: fixed; inset: 0; width: 100vw !important; height: 100vh !important; image-rendering: pixelated; image-rendering: crisp-edges; }
+
+  /* efeitos de fita VHS por cima de tudo */
+  .efeito { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+  #vinheta { background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.85) 100%); }
+  #linhas { background: repeating-linear-gradient(0deg, rgba(0,0,0,0.28) 0 2px, transparent 2px 4px); }
+  #ruido { width: 100vw; height: 100vh; image-rendering: pixelated; opacity: 0.07; mix-blend-mode: screen; }
+  #susto { background: #000; opacity: 0; }
+  #flashVermelho { background: radial-gradient(circle, rgba(255,0,40,0.0) 30%, rgba(255,0,40,0.55)); opacity: 0; }
+
+  /* ===== HUD ===== */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #hud.escondido { display: none; }
+  #objetivo { position: absolute; left: 20px; top: 16px; font-size: 1.15rem; color: var(--amarelo); text-shadow: 0 0 6px var(--amarelo); max-width: 70vw; }
+  #fusiveis { position: absolute; left: 20px; top: 46px; display: flex; gap: 6px; }
+  #fusiveis span { width: 16px; height: 22px; border: 2px solid #5a5040; background: transparent; }
+  #fusiveis span.ok { background: var(--amarelo); border-color: var(--amarelo); box-shadow: 0 0 8px var(--amarelo); }
+  #nomeMapa { position: absolute; right: 20px; top: 16px; font-size: 1rem; color: var(--suave); }
+  .barra { position: absolute; left: 20px; width: 170px; font-size: 0.95rem; color: var(--suave); }
+  .barra .trilho { height: 8px; background: #1a1424; border: 1px solid #3a3050; margin-top: 2px; }
+  .barra .cheio { height: 100%; width: 100%; }
+  #barraLanterna { bottom: 60px; }
+  #barraLanterna .cheio { background: #fff2b0; box-shadow: 0 0 6px #fff2b0; }
+  #barraFolego { bottom: 22px; }
+  #barraFolego .cheio { background: #8ad0ff; }
+  #mira { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; background: rgba(255,255,255,0.6); }
+  #mensagem { position: absolute; left: 50%; top: 64%; transform: translateX(-50%); font-size: 1.5rem; color: #fff; text-shadow: 0 0 8px var(--neon); text-align: center; white-space: nowrap; }
+  #dica { position: absolute; right: 20px; bottom: 22px; font-size: 0.95rem; color: var(--suave); text-align: right; }
+
+  /* ===== Telas ===== */
+  .tela { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 18px; padding: 24px; text-align: center; overflow-y: auto; background: radial-gradient(ellipse at center, rgba(30,0,20,0.92), #000 75%); }
+  .tela > :first-child { margin-top: auto; }
+  .tela > :last-child { margin-bottom: auto; }
+  .tela.escondida { display: none; }
+  .voltar { align-self: flex-start; color: var(--suave); text-decoration: none; font-size: 1rem; border: 1px solid #3a3050; padding: 4px 12px; }
+  .voltar:hover { color: var(--neon); border-color: var(--neon); }
+  .titulo { font-family: "Press Start 2P", monospace; font-size: clamp(1.8rem, 6vw, 3.6rem); color: var(--neon); line-height: 1.3; animation: falha 3s infinite; }
+  .titulo span { color: var(--vermelho); }
+  @keyframes falha {
+    0%, 86%, 100% { text-shadow: 0 0 14px var(--neon); transform: none; opacity: 1; }
+    87% { text-shadow: -4px 0 var(--ciano), 4px 0 var(--vermelho); transform: translateX(3px) skewX(8deg); }
+    89% { opacity: 0.2; }
+    90% { text-shadow: 3px 0 var(--ciano), -3px 0 var(--vermelho); transform: translateX(-4px); opacity: 1; }
+    92% { opacity: 0.4; }
+  }
+  .historia { max-width: 620px; line-height: 1.35; color: var(--texto); font-size: 1.2rem; }
+  .historia b { color: var(--amarelo); }
+  .secao h2 { font-size: 1rem; letter-spacing: 3px; color: var(--suave); margin-bottom: 8px; font-weight: normal; }
+  .opcoes { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .opcao { background: #0d0812; border: 2px solid #3a3050; color: var(--texto); font-family: inherit; font-size: 1.2rem; padding: 8px 18px; cursor: pointer; }
+  .opcao small { display: block; color: var(--suave); font-size: 0.9rem; }
+  .opcao.selecionada { border-color: var(--vermelho); box-shadow: 0 0 14px rgba(255,42,74,0.5); }
+  .mapa { width: 170px; padding: 8px; text-align: left; }
+  .mapa .mini { height: 54px; margin-bottom: 6px; border: 1px solid #3a3050; }
+  .mapa .rec { display: block; color: var(--amarelo); font-size: 0.85rem; }
+  .botao { font-family: "Press Start 2P", monospace; font-size: 1rem; background: transparent; color: var(--vermelho); border: 2px solid var(--vermelho); padding: 14px 34px; cursor: pointer; text-shadow: 0 0 8px var(--vermelho); box-shadow: 0 0 16px rgba(255,42,74,0.4); }
+  .botao:hover { background: rgba(255,42,74,0.12); }
+  .botao.sec { color: var(--suave); border-color: #3a3050; text-shadow: none; box-shadow: none; }
+  .controles { color: var(--suave); font-size: 1.05rem; line-height: 1.6; }
+  .controles b { color: var(--texto); border: 1px solid #3a3050; padding: 0 6px; }
+  .aviso { color: var(--suave); font-size: 0.95rem; max-width: 560px; }
+  .grande { font-family: "Press Start 2P", monospace; font-size: clamp(1.4rem, 5vw, 2.6rem); line-height: 1.4; }
+  .linha-botoes { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+</style>
+</head>
+<body>
+
+<canvas id="ruido" class="efeito" width="160" height="90"></canvas>
+<div id="linhas" class="efeito"></div>
+<div id="vinheta" class="efeito"></div>
+<div id="flashVermelho" class="efeito"></div>
+<div id="susto" class="efeito"></div>
+
+<!-- ===== Menu ===== -->
+<div class="tela" id="menu">
+  <a href="fliperama-neon.html" class="voltar">← Voltar ao Fliperama</a>
+  <div class="titulo">NEON <span>MORTO</span></div>
+  <p class="historia">
+    O fliperama fechou… e você ficou <b>trancado lá dentro</b>.<br>
+    Ache os <b>5 fusíveis</b> para religar a energia e abrir a <b>SAÍDA</b>.<br><br>
+    Mas o <b>Pixel</b>, o velho mascote do fliperama, ainda anda pelos corredores.<br>
+    Ele só se mexe quando <b>ninguém está olhando</b>.<br>
+    Não tire os olhos dele. E cuide da bateria da lanterna.
+  </p>
+  <div class="secao">
+    <h2>ONDE VOCÊ FICOU PRESO?</h2>
+    <div class="opcoes" id="opcoesMapa"></div>
+  </div>
+  <div class="secao">
+    <h2>DIFICULDADE</h2>
+    <div class="opcoes" id="opcoesDif">
+      <button class="opcao selecionada" data-dif="normal">Normal<small>3 pilhas extras</small></button>
+      <button class="opcao" data-dif="pesadelo">Pesadelo<small>ele é mais rápido · 1 pilha</small></button>
+    </div>
+  </div>
+  <button class="botao" id="botaoEntrar">ENTRAR</button>
+  <div class="controles">
+    <b>W A S D</b> andar · <b>Mouse</b> olhar · <b>Shift</b> correr · <b>F</b> lanterna · <b>P</b> pausar
+  </div>
+  <div class="aviso">🎧 Melhor com fone de ouvido. Jogo de suspense, sem sangue. Só para PC.</div>
+</div>
+
+<!-- ===== Pausa ===== -->
+<div class="tela escondida" id="pausa">
+  <div class="grande">PAUSADO</div>
+  <div class="linha-botoes">
+    <button class="botao" id="botaoContinuar">CONTINUAR</button>
+    <button class="botao sec" id="botaoMenuPausa">DESISTIR</button>
+  </div>
+</div>
+
+<!-- ===== Fim ===== -->
+<div class="tela escondida" id="fim">
+  <div class="grande" id="tituloFim"></div>
+  <p class="historia" id="textoFim"></p>
+  <div class="linha-botoes">
+    <button class="botao" id="botaoDeNovo">TENTAR DE NOVO</button>
+    <button class="botao sec" id="botaoMenuFim">MENU</button>
+  </div>
+</div>
+
+<!-- ===== HUD ===== -->
+<div id="hud" class="escondido">
+  <div id="objetivo">Ache os fusíveis</div>
+  <div id="fusiveis"><span></span><span></span><span></span><span></span><span></span></div>
+  <div id="nomeMapa"></div>
+  <div class="barra" id="barraLanterna">LANTERNA [F]<div class="trilho"><div class="cheio" id="cheioLanterna"></div></div></div>
+  <div class="barra" id="barraFolego">FÔLEGO [Shift]<div class="trilho"><div class="cheio" id="cheioFolego"></div></div></div>
+  <div id="mira"></div>
+  <div id="mensagem"></div>
+  <div id="dica">P pausa</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// =====================================================================
+//  NEON MORTO — terror em um fliperama abandonado (4 mapas)
+// =====================================================================
+
+const CEL = 4;          // tamanho de cada quadrado do mapa (metros)
+const ALT = 3.2;        // altura das paredes
+const ESCALA = 3;       // o jogo é desenhado 3x menor e ampliado (visual pixelado e leve)
+
+// ===== Os mapas =====
+// # parede · . chão · S começo · E saída
+// cores: parede, chão e luz ambiente de cada lugar. decoracao: o que enfeita o lugar.
+const MAPAS = {
+  salao: {
+    nome: "Salão Principal", descricao: "Máquinas desligadas e telas chiando",
+    miniatura: "linear-gradient(90deg, #2a1a38 0 20%, #ff2bd6 20% 24%, #0e0a24 24% 70%, #00f0ff 70% 74%, #2a1a38 74%)",
+    planta: [
+      "####################",
+      "#S.....#.....#.....#",
+      "#......#.....#.....#",
+      "#..##..#..#..#..#..#",
+      "#..##.....#.....#..#",
+      "#......#..#..#.....#",
+      "###.####..#..####.##",
+      "#......#.....#.....#",
+      "#.####.#.###.#.###.#",
+      "#.#....#...#.....#.#",
+      "#.#.##.###.#.###.#.#",
+      "#...#......#...#...#",
+      "###.#.####.###.#.###",
+      "#...#....#.....#...#",
+      "#.#####..#.###.###.#",
+      "#.....#..#...#.....#",
+      "#.###.##.###.#.###.#",
+      "#...#..........#...#",
+      "#...#..#.....#....E#",
+      "####################"
+    ],
+    parede: ["#2a1a38", "#24162f", "#33204a"], chao: "carpete", teto: "#141018",
+    ambiente: [0x2a2060, 0x0a0410], decoracao: "maquinas",
+    placas: [["INSERT COIN", "#ff2bd6", true], ["HI-SCORE", "#00f0ff", true], ["GAME OVER", "#ff2a4a", true], ["PLAYER 2?", "#39ff88", false], ["NÃO OLHE", "#ffe600", false]]
+  },
+  porao: {
+    nome: "Porão de Manutenção", descricao: "Corredores apertados e canos",
+    miniatura: "repeating-linear-gradient(90deg, #2a3230 0 10px, #1c1f1e 10px 20px), #2a3230",
+    planta: [
+      "######################",
+      "#S.#.....#......#....#",
+      "#..#.###.#.####.#.##.#",
+      "#....#...#....#...#..#",
+      "####.#.#####..#####..#",
+      "#....#.....#.......#.#",
+      "#.######.#.#.#####.#.#",
+      "#........#...#.....#.#",
+      "#.####.#####.#.#####.#",
+      "#....#.....#.#.......#",
+      "####.#####.#.#######.#",
+      "#....#.....#.......#.#",
+      "#.####.###.#######.#.#",
+      "#......#.........#...#",
+      "#.####...#######.###E#",
+      "######################"
+    ],
+    parede: ["#2a3230", "#232a28", "#303a37"], chao: "concreto", teto: "#0e1210",
+    ambiente: [0x1a3a2a, 0x040806], decoracao: "canos",
+    placas: [["MANUTENÇÃO", "#39ff88", true], ["PERIGO", "#ffe600", true], ["NÃO ENTRE", "#ff2a4a", false], ["ELE MORA AQUI", "#ff2a4a", false], ["SÓ FUNCIONÁRIOS", "#00f0ff", true]]
+  },
+  kids: {
+    nome: "Área Kids", descricao: "Piscinas de bolinhas… e sorrisos",
+    miniatura: "radial-gradient(circle at 30% 60%, #ff4a6a 0 6px, transparent 7px), radial-gradient(circle at 60% 40%, #4a8aff 0 6px, transparent 7px), radial-gradient(circle at 75% 70%, #ffe600 0 6px, transparent 7px), repeating-linear-gradient(90deg, #5a3048 0 12px, #6a5a30 12px 24px)",
+    planta: [
+      "##################",
+      "#S.......#.......#",
+      "#..##....#..##...#",
+      "#..##..........#.#",
+      "#.......##.......#",
+      "####.####..#####.#",
+      "#.......#........#",
+      "#..#.#..#..#..#..#",
+      "#.......#........#",
+      "#..#.#.....#..#..#",
+      "#.......#........#",
+      "######.###.#######",
+      "#....#.....#.....#",
+      "#.##.#..#..#.##..#",
+      "#.##....#.......E#",
+      "#....#..#..#.....#",
+      "#....#.....#.....#",
+      "##################"
+    ],
+    parede: ["#5a3048", "#6a5a30", "#3a4a6a"], chao: "espuma", teto: "#1a1020",
+    ambiente: [0x3a2040, 0x100608], decoracao: "bolinhas",
+    placas: [["SORRIA :)", "#ffe600", true], ["FESTA!", "#ff2bd6", true], ["BRINQUE COMIGO", "#00f0ff", false], ["PARABÉNS!", "#39ff88", true], ["VOLTE SEMPRE", "#ff2a4a", false]]
+  },
+  deposito: {
+    nome: "Depósito de Prêmios", descricao: "Estantes cheias de pelúcias",
+    miniatura: "repeating-linear-gradient(0deg, #3a2a1a 0 14px, #111 14px 16px), #3a2a1a",
+    planta: [
+      "####################",
+      "#S.................#",
+      "#.###.###.###.###..#",
+      "#.###.###.###.###..#",
+      "#..................#",
+      "#.#.#.#.#.#.#.#.##.#",
+      "#..................#",
+      "###.##########.#####",
+      "#........#.........#",
+      "#.######.#.######..#",
+      "#.#....#...#....#..#",
+      "#.#.##.#####.##.#..#",
+      "#.................E#",
+      "####################"
+    ],
+    parede: ["#3a2a1a", "#33251a", "#42301e"], chao: "xadrez", teto: "#120e0a",
+    ambiente: [0x3a2a20, 0x0a0604], decoracao: "estantes",
+    placas: [["PRÊMIOS", "#ffe600", true], ["1000 TICKETS", "#ff2bd6", true], ["TROQUE AQUI", "#00f0ff", false], ["NINGUÉM SAI", "#ff2a4a", false], ["PEGUE UM", "#39ff88", true]]
+  }
+};
+
+let MAPA, LIN, COL, inicio, saida, distDoInicio;
+let mapaEscolhido = "salao";
+const ehParede = (c, l) => l < 0 || c < 0 || l >= LIN || c >= COL || MAPA[l][c] === "#";
+const celulaDe = (x, z) => [Math.floor(x / CEL), Math.floor(z / CEL)];
+const centroDe = (c, l) => new THREE.Vector3(c * CEL + CEL / 2, 0, l * CEL + CEL / 2);
+const VIZINHOS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+const DIFS = {
+  normal:   { velMonstro: 2.4, extraPorFusivel: 0.3, pilhas: 3, drenagem: 1 / 95 },
+  pesadelo: { velMonstro: 3.0, extraPorFusivel: 0.35, pilhas: 1, drenagem: 1 / 70 }
+};
+let difEscolhida = "normal";
+document.querySelectorAll("#opcoesDif .opcao").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("#opcoesDif .opcao").forEach(x => x.classList.remove("selecionada"));
+  b.classList.add("selecionada");
+  difEscolhida = b.dataset.dif;
+}));
+
+// ===== Recordes (um por mapa) =====
+const formatar = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+function lerRecorde(id) {
+  try {
+    const v = Number(localStorage.getItem(`fliperama_neonmorto_${id}`)) || 0;
+    if (!v && id === "salao") return Number(localStorage.getItem("fliperama_neonmorto")) || 0; // recorde da versão antiga
+    return v;
+  } catch (e) { return 0; }
+}
+function salvarRecorde(id, segundos) {
+  try {
+    localStorage.setItem(`fliperama_neonmorto_${id}`, segundos);
+    const geral = Number(localStorage.getItem("fliperama_neonmorto")) || 0;
+    if (!geral || segundos < geral) localStorage.setItem("fliperama_neonmorto", segundos);
+  } catch (e) {}
+}
+function desenharMapas() {
+  const caixa = document.getElementById("opcoesMapa");
+  caixa.innerHTML = Object.entries(MAPAS).map(([id, m]) => {
+    const r = lerRecorde(id);
+    return `<button class="opcao mapa ${id === mapaEscolhido ? "selecionada" : ""}" data-mapa="${id}">
+      <div class="mini" style="background:${m.miniatura}"></div>${m.nome}<small>${m.descricao}</small>
+      <span class="rec">${r ? "🏆 fuga em " + formatar(r) : ""}</span></button>`;
+  }).join("");
+  caixa.querySelectorAll(".mapa").forEach(b => b.addEventListener("click", () => {
+    mapaEscolhido = b.dataset.mapa;
+    desenharMapas();
+    construirNivel(MAPAS[mapaEscolhido]);
+  }));
+}
+
+// ===== Renderizador em baixa resolução =====
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+renderer.domElement.id = "jogo";
+document.body.prepend(renderer.domElement);
+const cena = new THREE.Scene();
+cena.background = new THREE.Color(0x000000);
+cena.fog = new THREE.Fog(0x000000, 2, 26);
+const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 60);
+camera.rotation.order = "YXZ";
+cena.add(camera);
+function redimensionar() {
+  renderer.setPixelRatio(1);
+  renderer.setSize(Math.floor(innerWidth / ESCALA), Math.floor(innerHeight / ESCALA), false);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+}
+redimensionar();
+addEventListener("resize", redimensionar);
+
+const luzAmbiente = new THREE.HemisphereLight(0x2a2060, 0x0a0410, 0.6);
+cena.add(luzAmbiente);
+
+// Lanterna presa na câmera
+const lanterna = new THREE.SpotLight(0xfff0c8, 3.6, 26, 0.5, 0.45, 1);
+lanterna.position.set(0.25, -0.15, 0);
+const alvoLanterna = new THREE.Object3D();
+alvoLanterna.position.set(0, -0.1, -1);
+camera.add(lanterna, alvoLanterna);
+lanterna.target = alvoLanterna;
+
+// ===== Texturas desenhadas por código =====
+function textura(w, h, desenhar, rx = 1, ry = 1) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  desenhar(c.getContext("2d"), w, h, c);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.magFilter = THREE.NearestFilter;
+  return t;
+}
+function manchas(c, w, h, qtd, max) {
+  for (let i = 0; i < qtd; i++) { c.fillStyle = `rgba(0,0,0,${0.15 + Math.random() * 0.3})`; c.beginPath(); c.arc(Math.random() * w, Math.random() * h, 3 + Math.random() * max, 0, Math.PI * 2); c.fill(); }
+}
+function texturaParede(cores) {
+  return textura(64, 64, (c, w, h) => {
+    c.fillStyle = cores[0]; c.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 8) { c.fillStyle = x % 16 ? cores[1] : cores[2]; c.fillRect(x, 0, 4, h); }
+    manchas(c, w, h, 14, 9);
+    c.fillStyle = "rgba(0,0,0,0.5)"; c.fillRect(0, h - 10, w, 10); // rodapé
+  });
+}
+const DESENHOS_CHAO = {
+  carpete(c, w, h) { // carpete de fliperama dos anos 90
+    c.fillStyle = "#0e0a24"; c.fillRect(0, 0, w, h);
+    const cores = ["#ff2bd6", "#00f0ff", "#ffe600", "#39ff88"];
+    for (let i = 0; i < 16; i++) {
+      c.strokeStyle = cores[i % 4]; c.globalAlpha = 0.35; c.lineWidth = 2;
+      const x = Math.random() * w, y = Math.random() * h;
+      if (i % 2) { c.beginPath(); c.moveTo(x, y); c.lineTo(x + 6, y - 8); c.lineTo(x + 12, y); c.closePath(); c.stroke(); }
+      else { c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + 5, y - 6, x + 10, y); c.quadraticCurveTo(x + 15, y + 6, x + 20, y); c.stroke(); }
+    }
+    c.globalAlpha = 1;
+  },
+  concreto(c, w, h) {
+    c.fillStyle = "#1c1f1e"; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 300; i++) { c.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`; c.fillRect(Math.random() * w, Math.random() * h, 1, 1); }
+    manchas(c, w, h, 6, 12);
+    c.strokeStyle = "rgba(0,0,0,0.6)"; c.beginPath(); c.moveTo(0, 30); c.lineTo(20, 34); c.lineTo(40, 28); c.stroke(); // rachadura
+  },
+  espuma(c, w, h) { // tapete de espuma colorido (desbotado)
+    const cores = ["#5a2030", "#203a5a", "#5a5020", "#205a30"];
+    for (let x = 0; x < 2; x++) for (let y = 0; y < 2; y++) { c.fillStyle = cores[(x + y * 2) % 4]; c.fillRect(x * 32, y * 32, 32, 32); }
+    c.strokeStyle = "rgba(0,0,0,0.5)"; c.lineWidth = 2; c.strokeRect(0, 0, 64, 64); c.strokeRect(0, 0, 32, 32); c.strokeRect(32, 32, 32, 32);
+    manchas(c, w, h, 4, 8);
+  },
+  xadrez(c, w, h) {
+    for (let x = 0; x < 4; x++) for (let y = 0; y < 4; y++) { c.fillStyle = (x + y) % 2 ? "#1a1612" : "#5a5248"; c.fillRect(x * 16, y * 16, 16, 16); }
+    manchas(c, w, h, 6, 10);
+  }
+};
+
+// Tela de fliperama com chiado (atualizada durante o jogo)
+const canvasTela = document.createElement("canvas");
+canvasTela.width = 48; canvasTela.height = 36;
+const ctxTela = canvasTela.getContext("2d");
+const texTela = new THREE.CanvasTexture(canvasTela);
+texTela.magFilter = THREE.NearestFilter;
+let quadroTela = 0;
+function atualizarTela() {
+  quadroTela++;
+  const img = ctxTela.createImageData(48, 36);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = Math.random() * 120;
+    img.data[i] = v * 0.6; img.data[i + 1] = v * 0.3; img.data[i + 2] = v; img.data[i + 3] = 255;
+  }
+  ctxTela.putImageData(img, 0, 0);
+  if (quadroTela % 10 < 6) {
+    ctxTela.fillStyle = "#ff2bd6";
+    ctxTela.font = "8px monospace";
+    ctxTela.fillText(quadroTela % 40 < 20 ? "GAME" : "OVER", 12, 20);
+  }
+  texTela.needsUpdate = true;
+}
+atualizarTela();
+
+function texturaTexto(texto, cor, w = 256, h = 64) {
+  return textura(w, h, (c) => {
+    c.fillStyle = "#000"; c.fillRect(0, 0, w, h);
+    c.font = `bold ${Math.min(h * 0.55, (w * 1.6) / texto.length)}px monospace`;
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.shadowBlur = 12; c.shadowColor = cor; c.fillStyle = cor;
+    c.fillText(texto, w / 2, h / 2);
+  });
+}
+const texBrilho = textura(32, 32, (c) => {
+  const gr = c.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+  c.fillStyle = gr; c.fillRect(0, 0, 32, 32);
+});
+
+// ===== Montagem do nível escolhido =====
+let nivel = null, mapaAtual = null;
+let colisores = [];        // retângulos {minX,maxX,minZ,maxZ}
+let placasPiscando = [];
+let luzesNeon = [];
+let porta, placaSaida;
+let aleat;
+
+function adicionar(obj) { nivel.add(obj); return obj; }
+function bloqueia(x, z, hx, hz) { colisores.push({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz }); }
+
+function construirNivel(def) {
+  if (mapaAtual === def) return;
+  mapaAtual = def;
+  if (nivel) { cena.remove(nivel); nivel.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+  nivel = new THREE.Group();
+  cena.add(nivel);
+  colisores = []; placasPiscando = []; luzesNeon = [];
+  let s = 7;
+  aleat = () => (s = (s * 16807) % 2147483647) / 2147483647; // sorteio com semente: o mapa sai sempre igual
+
+  MAPA = def.planta; LIN = MAPA.length; COL = MAPA[0].length;
+  MAPA.forEach((linha, l) => [...linha].forEach((ch, c) => {
+    if (ch === "S") inicio = [c, l];
+    if (ch === "E") saida = [c, l];
+  }));
+  distDoInicio = distancias(inicio);
+  luzAmbiente.color.set(def.ambiente[0]);
+  luzAmbiente.groundColor.set(def.ambiente[1]);
+
+  // paredes
+  const matParede = new THREE.MeshPhongMaterial({ map: texturaParede(def.parede), shininess: 4 });
+  const geoParede = new THREE.BoxGeometry(CEL, ALT, CEL);
+  MAPA.forEach((linha, l) => [...linha].forEach((ch, c) => {
+    if (ch !== "#") return;
+    colisores.push({ minX: c * CEL, maxX: (c + 1) * CEL, minZ: l * CEL, maxZ: (l + 1) * CEL });
+    if (!VIZINHOS.some(([dc, dl]) => !ehParede(c + dc, l + dl))) return; // parede escondida: nem desenha
+    const m = adicionar(new THREE.Mesh(geoParede, matParede));
+    m.position.set(c * CEL + CEL / 2, ALT / 2, l * CEL + CEL / 2);
+  }));
+  // chão e teto
+  const chao = adicionar(new THREE.Mesh(new THREE.PlaneGeometry(COL * CEL, LIN * CEL),
+    new THREE.MeshPhongMaterial({ map: textura(64, 64, DESENHOS_CHAO[def.chao], COL, LIN), shininess: 2 })));
+  chao.rotation.x = -Math.PI / 2;
+  chao.position.set(COL * CEL / 2, 0, LIN * CEL / 2);
+  const teto = adicionar(new THREE.Mesh(new THREE.PlaneGeometry(COL * CEL, LIN * CEL), new THREE.MeshPhongMaterial({
+    map: textura(32, 32, (c, w, h) => { c.fillStyle = def.teto; c.fillRect(0, 0, w, h); c.strokeStyle = "rgba(0,0,0,0.6)"; c.strokeRect(0.5, 0.5, w - 1, h - 1); }, COL * 2, LIN * 2)
+  })));
+  teto.rotation.x = Math.PI / 2;
+  teto.position.set(COL * CEL / 2, ALT, LIN * CEL / 2);
+
+  DECORACOES[def.decoracao]();
+  colocarPlacas(def.placas);
+  colocarPorta();
+}
+
+// Lados de parede livres (para encostar máquinas, estantes e placas)
+function ladosDeParede() {
+  const lista = [];
+  MAPA.forEach((linha, l) => [...linha].forEach((ch, c) => {
+    if (ch === "#" || ch === "S" || ch === "E") return;
+    VIZINHOS.forEach(([dc, dl]) => { if (ehParede(c + dc, l + dl)) lista.push({ c, l, dc, dl }); });
+  }));
+  return lista;
+}
+
+// Coloca um objeto encostado numa parede, virado para dentro da sala
+function encostar(obj, lado, afastamento, larg) {
+  const centro = centroDe(lado.c, lado.l);
+  obj.position.x = centro.x + lado.dc * (CEL / 2 - afastamento);
+  obj.position.z = centro.z + lado.dl * (CEL / 2 - afastamento);
+  obj.rotation.y = Math.atan2(-lado.dc, -lado.dl);
+  adicionar(obj);
+  if (larg) bloqueia(obj.position.x, obj.position.z, lado.dc ? afastamento : larg, lado.dl ? afastamento : larg);
+  return obj;
+}
+
+const DECORACOES = {
+  // Máquinas de fliperama com telas chiando
+  maquinas() {
+    const matTela = new THREE.MeshBasicMaterial({ map: texTela });
+    const coresMaquina = [0x2a1830, 0x30161a, 0x16243a, 0x1a2a1a];
+    const coresLetreiro = [0xff2bd6, 0x00f0ff, 0xffe600, 0x39ff88];
+    ladosDeParede().forEach(lado => {
+      if (aleat() > 0.2) return;
+      const g = new THREE.Group();
+      const corpo = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.9, 0.8), new THREE.MeshPhongMaterial({ color: coresMaquina[Math.floor(aleat() * 4)] }));
+      corpo.position.y = 0.95;
+      const tela = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.52), matTela);
+      tela.position.set(0, 1.3, 0.41);
+      tela.rotation.x = -0.2;
+      const letreiro = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.22, 0.1), new THREE.MeshBasicMaterial({ color: coresLetreiro[Math.floor(aleat() * 4)], transparent: true }));
+      letreiro.position.set(0, 1.78, 0.38);
+      const painel = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.12, 0.35), new THREE.MeshPhongMaterial({ color: 0x111111 }));
+      painel.position.set(0, 0.98, 0.5);
+      g.add(corpo, tela, letreiro, painel);
+      encostar(g, lado, 0.45, 0.55);
+      if (aleat() < 0.35) placasPiscando.push(letreiro.material);
+    });
+  },
+
+  // Canos no teto dos corredores, caixas e lâmpadas fluorescentes piscando
+  canos() {
+    const matCano = new THREE.MeshPhongMaterial({ color: 0x3a4a44, shininess: 30 });
+    const matCaixa = new THREE.MeshPhongMaterial({ color: 0x4a3a22 });
+    const geoCano = new THREE.CylinderGeometry(0.12, 0.12, CEL, 8);
+    MAPA.forEach((linha, l) => [...linha].forEach((ch, c) => {
+      if (ch === "#") return;
+      const p = centroDe(c, l);
+      const horizontal = ehParede(c, l - 1) && ehParede(c, l + 1);
+      const vertical = ehParede(c - 1, l) && ehParede(c + 1, l);
+      if (horizontal || vertical) {
+        [-0.6, 0.6].forEach(desl => {
+          const cano = adicionar(new THREE.Mesh(geoCano, matCano));
+          cano.rotation[horizontal ? "z" : "x"] = Math.PI / 2;
+          cano.position.set(p.x + (vertical ? desl : 0), 2.85, p.z + (horizontal ? desl : 0));
+        });
+      }
+      if (aleat() < 0.12) { // lâmpada fluorescente
+        const lamp = adicionar(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.06, 0.15), new THREE.MeshBasicMaterial({ color: 0xc8ffd8, transparent: true })));
+        lamp.position.set(p.x, ALT - 0.05, p.z);
+        placasPiscando.push(lamp.material);
+      }
+    }));
+    ladosDeParede().forEach(lado => {
+      if (aleat() > 0.14) return;
+      const caixa = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.9 + aleat() * 0.6, 1.0), matCaixa);
+      caixa.position.y = caixa.geometry.parameters.height / 2;
+      const g = new THREE.Group();
+      g.add(caixa);
+      encostar(g, lado, 0.55, 0.6);
+    });
+  },
+
+  // Piscinas de bolinhas nas salas abertas e blocos de brinquedo
+  bolinhas() {
+    const cores = [0xff4a6a, 0x4a8aff, 0xffe600, 0x39ff88, 0xff8a3d];
+    const geoBola = new THREE.SphereGeometry(0.16, 6, 4);
+    const matBola = new THREE.MeshLambertMaterial();
+    const matBorda = new THREE.MeshPhongMaterial({ color: 0x3a6aff });
+    let piscinas = 0;
+    MAPA.forEach((linha, l) => [...linha].forEach((ch, c) => {
+      if (ch !== "." || piscinas >= 6 || distDoInicio[l][c] < 3) return;
+      const livres = VIZINHOS.filter(([dc, dl]) => !ehParede(c + dc, l + dl)).length;
+      const diagonais = [[1, 1], [1, -1], [-1, 1], [-1, -1]].filter(([dc, dl]) => !ehParede(c + dc, l + dl)).length;
+      if (livres < 4 || diagonais < 3 || aleat() > 0.35) return;
+      piscinas++;
+      const p = centroDe(c, l);
+      [[0, -1.3, 2.8, 0.2], [0, 1.3, 2.8, 0.2], [-1.3, 0, 0.2, 2.8], [1.3, 0, 0.2, 2.8]].forEach(([dx, dz, w, d]) => {
+        const borda = adicionar(new THREE.Mesh(new THREE.BoxGeometry(w, 0.55, d), matBorda));
+        borda.position.set(p.x + dx, 0.275, p.z + dz);
+      });
+      const bolas = new THREE.InstancedMesh(geoBola, matBola, 70);
+      const m = new THREE.Matrix4(), cor = new THREE.Color();
+      for (let i = 0; i < 70; i++) {
+        m.setPosition(p.x + (aleat() - 0.5) * 2.3, 0.15 + aleat() * 0.3, p.z + (aleat() - 0.5) * 2.3);
+        bolas.setMatrixAt(i, m);
+        bolas.setColorAt(i, cor.setHex(cores[Math.floor(aleat() * cores.length)]).multiplyScalar(0.7));
+      }
+      adicionar(bolas);
+      bloqueia(p.x, p.z, 1.45, 1.45);
+    }));
+    // blocos de letras gigantes encostados nas paredes
+    const letras = "ABCPIXEL";
+    ladosDeParede().forEach(lado => {
+      if (aleat() > 0.1) return;
+      const g = new THREE.Group();
+      const corBloco = cores[Math.floor(aleat() * cores.length)];
+      const bloco = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), [0, 1, 2, 3, 4, 5].map(() =>
+        new THREE.MeshPhongMaterial({ map: textura(32, 32, (c) => {
+          c.fillStyle = "#" + corBloco.toString(16).padStart(6, "0"); c.fillRect(0, 0, 32, 32);
+          c.fillStyle = "#fff"; c.font = "bold 24px monospace"; c.textAlign = "center"; c.textBaseline = "middle";
+          c.fillText(letras[Math.floor(aleat() * letras.length)], 16, 17);
+        }) })));
+      bloco.position.y = 0.5;
+      bloco.rotation.y = aleat();
+      g.add(bloco);
+      encostar(g, lado, 0.6, 0.6);
+    });
+  },
+
+  // Estantes com pelúcias olhando para você
+  estantes() {
+    const matMadeira = new THREE.MeshPhongMaterial({ color: 0x4a3420 });
+    const coresPelucia = [0xd06a8a, 0x6a8ad0, 0xd0c06a, 0x8ad06a, 0xa06ad0];
+    const matOlho = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    ladosDeParede().forEach(lado => {
+      if (aleat() > 0.35) return;
+      const g = new THREE.Group();
+      const fundo = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.4, 0.1), matMadeira);
+      fundo.position.set(0, 1.2, -0.25);
+      g.add(fundo);
+      [0.15, 0.95, 1.75].forEach(y => {
+        const prateleira = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, 0.55), matMadeira);
+        prateleira.position.set(0, y, 0);
+        g.add(prateleira);
+        for (let k = 0; k < 3; k++) {
+          if (aleat() < 0.25) continue;
+          const pel = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.4, 0.3), new THREE.MeshLambertMaterial({ color: coresPelucia[Math.floor(aleat() * 5)] }));
+          pel.position.set(-0.5 + k * 0.5, y + 0.24, 0);
+          pel.rotation.y = (aleat() - 0.5) * 0.6;
+          [-0.08, 0.08].forEach(ox => {
+            const olho = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), matOlho);
+            olho.position.set(ox, 0.06, 0.16);
+            pel.add(olho);
+          });
+          g.add(pel);
+        }
+      });
+      encostar(g, lado, 0.35, 0.85);
+    });
+  }
+};
+
+// Placas neon em paredes espalhadas pelo mapa (algumas com luz de verdade)
+function colocarPlacas(lista) {
+  const lados = ladosDeParede().filter(ld => distDoInicio[ld.l][ld.c] > 2 && distDoInicio[ld.l][ld.c] < Infinity);
+  lados.sort(() => aleat() - 0.5);
+  const usadas = [];
+  lista.forEach(([texto, cor, comLuz]) => {
+    const lado = lados.find(ld => usadas.every(u => Math.abs(u.c - ld.c) + Math.abs(u.l - ld.l) > 4));
+    if (!lado) return;
+    usadas.push(lado);
+    const placa = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.55), new THREE.MeshBasicMaterial({ map: texturaTexto(texto, cor), transparent: true, blending: THREE.AdditiveBlending }));
+    placa.position.y = 2.5;
+    encostar(placa, lado, 0.02);
+    placasPiscando.push(placa.material);
+    if (comLuz) {
+      const luz = adicionar(new THREE.PointLight(new THREE.Color(cor), 0.7, 9, 2));
+      const centro = centroDe(lado.c, lado.l);
+      luz.position.set(centro.x + lado.dc * (CEL / 2 - 0.6), 2.3, centro.z + lado.dl * (CEL / 2 - 0.6));
+      luzesNeon.push(luz);
+    }
+  });
+}
+
+// Porta de saída na parede ao lado do E
+function colocarPorta() {
+  const [dc, dl] = VIZINHOS.find(([x, z]) => ehParede(saida[0] + x, saida[1] + z));
+  const g = new THREE.Group();
+  porta = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.4, 1.8), new THREE.MeshPhongMaterial({ color: 0x3a1010 }));
+  porta.position.y = 1.2;
+  placaSaida = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.4), new THREE.MeshBasicMaterial({ map: texturaTexto("SAÍDA", "#ff2a4a"), transparent: true, blending: THREE.AdditiveBlending }));
+  placaSaida.position.set(-0.1, 2.75, 0);
+  placaSaida.rotation.y = -Math.PI / 2;
+  g.add(porta, placaSaida);
+  const c = centroDe(...saida);
+  g.position.set(c.x + dc * (CEL / 2 - 0.08), 0, c.z + dl * (CEL / 2 - 0.08));
+  g.rotation.y = Math.atan2(-dl, dc); // o "lado +x" da porta aponta para a parede
+  adicionar(g);
+}
+
+// ===== Pixel, o mascote =====
+function criarMonstro() {
+  const g = new THREE.Group();
+  const corPelo = new THREE.MeshPhongMaterial({ color: 0x5a3a7a, shininess: 2 });
+  const corCabeca = new THREE.MeshPhongMaterial({ color: 0xb8a060, shininess: 2 });
+  const preto = new THREE.MeshBasicMaterial({ color: 0x050005 });
+  const add = (geo, mat, x, y, z, pai = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); pai.add(m); return m; };
+  add(new THREE.BoxGeometry(0.9, 1.3, 0.55), corPelo, 0, 1.25, 0);                 // corpo
+  add(new THREE.BoxGeometry(0.28, 0.9, 0.3), corPelo, -0.25, 0.45, 0);             // pernas
+  add(new THREE.BoxGeometry(0.28, 0.9, 0.3), corPelo, 0.25, 0.45, 0);
+  const bracoE = add(new THREE.BoxGeometry(0.2, 1.4, 0.2), corPelo, -0.6, 1.2, 0.05); // braços compridos
+  const bracoD = add(new THREE.BoxGeometry(0.2, 1.4, 0.2), corPelo, 0.6, 1.2, 0.05);
+  bracoE.rotation.z = 0.08; bracoD.rotation.z = -0.08;
+  const cabeca = new THREE.Group();
+  cabeca.position.y = 2.3;
+  g.add(cabeca);
+  add(new THREE.BoxGeometry(1.0, 0.9, 0.9), corCabeca, 0, 0, 0, cabeca);
+  add(new THREE.BoxGeometry(0.25, 0.35, 0.25), corCabeca, -0.38, 0.55, 0, cabeca); // orelhas
+  add(new THREE.BoxGeometry(0.25, 0.35, 0.25), corCabeca, 0.38, 0.55, 0, cabeca);
+  const olho = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  add(new THREE.BoxGeometry(0.2, 0.2, 0.05), olho, -0.22, 0.12, 0.46, cabeca);
+  add(new THREE.BoxGeometry(0.2, 0.2, 0.05), olho, 0.22, 0.12, 0.46, cabeca);
+  add(new THREE.BoxGeometry(0.07, 0.07, 0.06), preto, -0.22, 0.12, 0.48, cabeca);  // pupilas
+  add(new THREE.BoxGeometry(0.07, 0.07, 0.06), preto, 0.22, 0.12, 0.48, cabeca);
+  add(new THREE.BoxGeometry(0.7, 0.16, 0.05), preto, 0, -0.22, 0.46, cabeca);      // sorriso
+  for (let i = 0; i < 6; i++) add(new THREE.BoxGeometry(0.06, 0.07, 0.06), olho, -0.25 + i * 0.1, -0.17, 0.48, cabeca); // dentes
+  const brilho = new THREE.PointLight(0xff3060, 0.6, 4, 2); // olhos brilham fraco no escuro
+  brilho.position.set(0, 2.4, 0.7);
+  g.add(brilho);
+  cena.add(g);
+  return { grupo: g, cabeca, brilho };
+}
+const monstro = criarMonstro();
+
+// ===== Itens: fusíveis e pilhas =====
+let itens = [];
+function criarItem(tipo, c, l) {
+  const g = new THREE.Group();
+  const cor = tipo === "fusivel" ? 0xffe600 : 0x39ff88;
+  const corpo = new THREE.Mesh(tipo === "fusivel" ? new THREE.BoxGeometry(0.22, 0.36, 0.22) : new THREE.CylinderGeometry(0.09, 0.09, 0.32, 8), new THREE.MeshBasicMaterial({ color: cor }));
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilho, color: cor, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
+  halo.scale.set(1.2, 1.2, 1);
+  g.add(corpo, halo);
+  const p = centroDe(c, l);
+  g.position.set(p.x + (Math.random() - 0.5) * 1.2, 0.9, p.z + (Math.random() - 0.5) * 1.2);
+  cena.add(g);
+  itens.push({ tipo, grupo: g, pego: false });
+}
+
+// ===== Caminhos no mapa (busca em largura) =====
+function distancias(origem) {
+  const dist = Array.from({ length: LIN }, () => Array(COL).fill(Infinity));
+  const fila = [origem];
+  dist[origem[1]][origem[0]] = 0;
+  while (fila.length) {
+    const [c, l] = fila.shift();
+    for (const [dc, dl] of VIZINHOS) {
+      const nc = c + dc, nl = l + dl;
+      if (ehParede(nc, nl) || dist[nl][nc] !== Infinity) continue;
+      dist[nl][nc] = dist[l][c] + 1;
+      fila.push([nc, nl]);
+    }
+  }
+  return dist;
+}
+
+// Linha de visão: anda pela reta e vê se passa por parede
+function linhaLivre(a, b) {
+  const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz);
+  const passos = Math.ceil(d / 0.4);
+  for (let i = 1; i < passos; i++) {
+    const [c, l] = celulaDe(a.x + dx * i / passos, a.z + dz * i / passos);
+    if (ehParede(c, l)) return false;
+  }
+  return true;
+}
+
+// ===== Estado =====
+const jogador = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, lanterna: 1, ligada: true, folego: 1 };
+let estado = "menu", fusiveis = 0, ativo = false, tempo = 0, teclas = {};
+let dif = DIFS.normal;
+let mon = { pos: new THREE.Vector3(-99, 0, -99), caminho: [], tempoCaminho: 0, passo: 0, sendoVisto: false, distancia: 99 };
+let apagao = { proximo: 25, aviso: 0, duracao: 0 };
+let distPasso = 0, tempoCoracao = 0, tempoMensagem = 0;
+
+function iniciar() {
+  dif = DIFS[difEscolhida];
+  construirNivel(MAPAS[mapaEscolhido]);
+  const p = centroDe(...inicio);
+  jogador.pos.set(p.x, 0, p.z);
+  // começa olhando para o lado aberto
+  const aberto = VIZINHOS.find(([dc, dl]) => !ehParede(inicio[0] + dc, inicio[1] + dl));
+  jogador.yaw = Math.atan2(-aberto[0], -aberto[1]);
+  jogador.pitch = 0;
+  jogador.lanterna = 1; jogador.ligada = true; jogador.folego = 1;
+  fusiveis = 0; ativo = false; tempo = 0;
+  apagao = { proximo: 25, aviso: 0, duracao: 0 };
+  document.querySelectorAll("#fusiveis span").forEach(s => s.classList.remove("ok"));
+  document.getElementById("objetivo").textContent = "Ache os 5 fusíveis";
+  document.getElementById("nomeMapa").textContent = MAPAS[mapaEscolhido].nome.toUpperCase();
+  porta.material.color.set(0x3a1010);
+  placaSaida.material.map = texturaTexto("SAÍDA", "#ff2a4a");
+
+  // itens em lugares longe do começo (sorteados a cada partida)
+  itens.forEach(i => cena.remove(i.grupo));
+  itens = [];
+  const livres = [];
+  MAPA.forEach((linha, l) => [...linha].forEach((ch, c) => {
+    const ocupado = colisores.some(k => k.maxX - k.minX < CEL && Math.abs((k.minX + k.maxX) / 2 - (c * CEL + CEL / 2)) < 1.6 && Math.abs((k.minZ + k.maxZ) / 2 - (l * CEL + CEL / 2)) < 1.6);
+    if (ch === "." && !ocupado && distDoInicio[l][c] > 4 && distDoInicio[l][c] < Infinity) livres.push([c, l]);
+  }));
+  livres.sort(() => Math.random() - 0.5);
+  const escolhidos = [];
+  for (const cel of livres) {
+    if (escolhidos.every(o => Math.abs(o[0] - cel[0]) + Math.abs(o[1] - cel[1]) > 4)) escolhidos.push(cel);
+    if (escolhidos.length >= 5 + dif.pilhas) break;
+  }
+  escolhidos.forEach((cel, i) => criarItem(i < 5 ? "fusivel" : "pilha", cel[0], cel[1]));
+
+  // Pixel começa no canto mais distante
+  let maisLonge = inicio, maior = 0;
+  distDoInicio.forEach((linha, l) => linha.forEach((d, c) => { if (d < Infinity && d > maior) { maior = d; maisLonge = [c, l]; } }));
+  const pm = centroDe(...maisLonge);
+  mon.pos.set(pm.x, 0, pm.z);
+  mon.caminho = [];
+
+  estado = "jogando";
+  mostrarTela(null);
+  document.getElementById("hud").classList.remove("escondido");
+  mostrarMensagem("Está escuro… ache os fusíveis.", 4);
+  iniciarAmbiente();
+  travar();
+}
+
+function travar() { const r = renderer.domElement.requestPointerLock(); if (r && r.catch) r.catch(() => {}); }
+function mostrarTela(id) { ["menu", "pausa", "fim"].forEach(t => document.getElementById(t).classList.toggle("escondida", t !== id)); }
+function mostrarMensagem(t, s) { document.getElementById("mensagem").textContent = t; tempoMensagem = s; }
+
+// ===== Colisão do jogador =====
+function mover(pos, dx, dz, r) {
+  pos.x += dx; resolver(pos, r);
+  pos.z += dz; resolver(pos, r);
+}
+function resolver(pos, r) {
+  for (const k of colisores) {
+    if (k.maxX < pos.x - CEL * 1.5 || k.minX > pos.x + CEL * 1.5 || k.maxZ < pos.z - CEL * 1.5 || k.minZ > pos.z + CEL * 1.5) continue;
+    const px = Math.max(k.minX, Math.min(pos.x, k.maxX)), pz = Math.max(k.minZ, Math.min(pos.z, k.maxZ));
+    const dx = pos.x - px, dz = pos.z - pz, d2 = dx * dx + dz * dz;
+    if (d2 < r * r && d2 > 1e-8) { const d = Math.sqrt(d2); pos.x += dx / d * (r - d); pos.z += dz / d * (r - d); }
+  }
+}
+
+// ===== Atualização =====
+function atualizarJogador(dt) {
+  const correndo = (teclas.ShiftLeft || teclas.ShiftRight) && jogador.folego > 0.05;
+  const frente = new THREE.Vector3(-Math.sin(jogador.yaw), 0, -Math.cos(jogador.yaw));
+  const direita = new THREE.Vector3(Math.cos(jogador.yaw), 0, -Math.sin(jogador.yaw));
+  const mov = new THREE.Vector3();
+  if (teclas.KeyW) mov.add(frente);
+  if (teclas.KeyS) mov.sub(frente);
+  if (teclas.KeyD) mov.add(direita);
+  if (teclas.KeyA) mov.sub(direita);
+  const andando = mov.lengthSq() > 0;
+  const vel = correndo && andando ? 5.2 : 3.0;
+  if (andando) {
+    mov.normalize().multiplyScalar(vel * dt);
+    mover(jogador.pos, mov.x, mov.z, 0.35);
+    distPasso += vel * dt;
+    if (distPasso > (correndo ? 2.4 : 1.9)) { distPasso = 0; somPasso(correndo ? 0.5 : 0.3); }
+  }
+  jogador.folego = correndo && andando ? Math.max(0, jogador.folego - dt / 4) : Math.min(1, jogador.folego + dt / 7);
+
+  // lanterna gasta bateria; no apagão ela falha
+  if (jogador.ligada) jogador.lanterna = Math.max(0, jogador.lanterna - dt * dif.drenagem);
+  if (jogador.lanterna <= 0 && jogador.ligada) { jogador.ligada = false; mostrarMensagem("A lanterna apagou… ache uma pilha!", 3); }
+  let intensidade = jogador.ligada ? 3.6 * (0.4 + 0.6 * Math.min(1, jogador.lanterna * 3)) : 0;
+  if (jogador.ligada && jogador.lanterna < 0.15 && Math.random() < 0.08) intensidade *= 0.2; // pisca quando a pilha está acabando
+  if (apagao.aviso > 0 && Math.random() < 0.35) intensidade *= 0.1;
+  if (apagao.duracao > 0) intensidade = 0;
+  lanterna.intensity = intensidade;
+
+  // balanço da câmera ao andar
+  const bob = andando ? Math.sin(tempo * (correndo ? 14 : 9)) * 0.05 : 0;
+  camera.position.set(jogador.pos.x, 1.6 + bob, jogador.pos.z);
+  camera.rotation.set(jogador.pitch, jogador.yaw, 0);
+
+  // pegar itens
+  for (const it of itens) {
+    if (it.pego) continue;
+    it.grupo.rotation.y += dt * 2;
+    it.grupo.position.y = 0.9 + Math.sin(tempo * 3 + it.grupo.position.x) * 0.08;
+    if (Math.hypot(it.grupo.position.x - jogador.pos.x, it.grupo.position.z - jogador.pos.z) < 1.3) pegar(it);
+  }
+
+  // saída
+  if (fusiveis >= 5) {
+    const [c, l] = celulaDe(jogador.pos.x, jogador.pos.z);
+    if (c === saida[0] && l === saida[1]) vencer();
+  }
+}
+
+function pegar(it) {
+  it.pego = true;
+  cena.remove(it.grupo);
+  if (it.tipo === "pilha") {
+    jogador.lanterna = 1;
+    jogador.ligada = true;
+    tom(880, 0.15, "sine", 0.1); tom(1320, 0.2, "sine", 0.08, 0.1);
+    mostrarMensagem("Pilha nova na lanterna.", 2.5);
+    return;
+  }
+  fusiveis++;
+  document.querySelectorAll("#fusiveis span")[fusiveis - 1].classList.add("ok");
+  tom(660, 0.2, "triangle", 0.12); tom(990, 0.3, "triangle", 0.1, 0.12);
+  if (fusiveis === 1) {
+    ativo = true;
+    setTimeout(() => { tom(70, 1.4, "sawtooth", 0.12); }, 400);
+    mostrarMensagem("Algo acordou lá no fundo…", 4);
+  } else if (fusiveis < 5) {
+    mostrarMensagem(`${fusiveis}/5 fusíveis. Ele está mais rápido.`, 3);
+  }
+  if (fusiveis === 5) {
+    document.getElementById("objetivo").textContent = "A ENERGIA VOLTOU! CORRA PARA A SAÍDA!";
+    porta.material.color.set(0x104020);
+    placaSaida.material.map = texturaTexto("SAÍDA", "#39ff88");
+    mostrarMensagem("A porta abriu! CORRA!", 4);
+    tom(523, 0.2, "square", 0.08); tom(659, 0.2, "square", 0.08, 0.2); tom(784, 0.4, "square", 0.08, 0.4);
+  } else {
+    document.getElementById("objetivo").textContent = `Ache os fusíveis (${fusiveis}/5)`;
+  }
+}
+
+// Pixel: só anda quando ninguém está olhando
+function atualizarMonstro(dt) {
+  const p = mon.pos;
+  const olhos = new THREE.Vector3(p.x, 2.3, p.z);
+  const voce = new THREE.Vector3(jogador.pos.x, 1.6, jogador.pos.z);
+  mon.distancia = Math.hypot(p.x - jogador.pos.x, p.z - jogador.pos.z);
+
+  // você está vendo ele? (na frente, sem parede no meio e com luz suficiente)
+  const dir = olhos.clone().sub(voce).normalize();
+  const frente = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  const naFrente = dir.dot(frente) > Math.cos(THREE.MathUtils.degToRad(46));
+  const alcance = lanterna.intensity > 0.3 ? 22 : 4.5;
+  mon.sendoVisto = naFrente && mon.distancia < alcance && linhaLivre(voce, olhos);
+
+  // a cabeça sempre vira para você
+  monstro.cabeca.rotation.y = Math.atan2(jogador.pos.x - p.x, jogador.pos.z - p.z) - monstro.grupo.rotation.y;
+
+  if (!ativo) return;
+  if (mon.distancia < 1.15) return pego(); // encostou nele: pego, mesmo olhando
+  const podeAndar = !mon.sendoVisto || apagao.duracao > 0;
+  if (!podeAndar) { monstro.grupo.rotation.z = 0; return; }
+
+  // recalcula o caminho de vez em quando
+  mon.tempoCaminho -= dt;
+  if (mon.tempoCaminho <= 0) {
+    mon.tempoCaminho = 0.5;
+    const dist = distancias(celulaDe(jogador.pos.x, jogador.pos.z));
+    let [c, l] = celulaDe(p.x, p.z);
+    mon.caminho = [];
+    for (let k = 0; k < 3; k++) {
+      let melhor = null, menor = dist[l] ? dist[l][c] : Infinity;
+      for (const [dc, dl] of VIZINHOS) {
+        if (!ehParede(c + dc, l + dl) && dist[l + dl][c + dc] < menor) { menor = dist[l + dl][c + dc]; melhor = [c + dc, l + dl]; }
+      }
+      if (!melhor) break;
+      [c, l] = melhor;
+      mon.caminho.push(centroDe(c, l));
+    }
+  }
+  // na mesma sala e sem parede no meio: vai direto em você
+  let alvo = mon.caminho[0];
+  if ((mon.distancia < CEL * 1.2 && linhaLivre(p, jogador.pos)) || !alvo) alvo = jogador.pos;
+  const vel = (dif.velMonstro + fusiveis * dif.extraPorFusivel) * (apagao.duracao > 0 ? 1.6 : 1);
+  const dx = alvo.x - p.x, dz = alvo.z - p.z, d = Math.hypot(dx, dz);
+  if (d < 0.3 && mon.caminho.length) mon.caminho.shift();
+  else if (d > 0.01) {
+    p.x += dx / d * Math.min(d, vel * dt);
+    p.z += dz / d * Math.min(d, vel * dt);
+    monstro.grupo.rotation.y = Math.atan2(dx, dz);
+  }
+  monstro.grupo.rotation.z = (Math.random() - 0.5) * 0.12; // treme quando anda (como um robô quebrado)
+
+  mon.passo += dt;
+  if (mon.passo > 0.5) { mon.passo = 0; somMonstro(); }
+}
+
+function atualizarApagao(dt) {
+  if (!ativo) return;
+  if (apagao.duracao > 0) {
+    apagao.duracao -= dt;
+    if (apagao.duracao <= 0) apagao.proximo = 16 + Math.random() * 14;
+    return;
+  }
+  if (apagao.aviso > 0) {
+    apagao.aviso -= dt;
+    if (apagao.aviso <= 0) { apagao.duracao = 1.3; zumbido(); }
+    return;
+  }
+  apagao.proximo -= dt;
+  if (apagao.proximo <= 0) { apagao.aviso = 1.6; mostrarMensagem("As luzes estão falhando…", 2); }
+}
+
+// ===== Efeitos de tela =====
+const ctxRuido = document.getElementById("ruido").getContext("2d");
+const imgRuido = ctxRuido.createImageData(160, 90);
+function atualizarEfeitos(dt) {
+  for (let i = 0; i < imgRuido.data.length; i += 4) {
+    const v = Math.random() * 255;
+    imgRuido.data[i] = imgRuido.data[i + 1] = imgRuido.data[i + 2] = v;
+    imgRuido.data[i + 3] = 255;
+  }
+  ctxRuido.putImageData(imgRuido, 0, 0);
+  const perto = estado === "jogando" && ativo ? Math.max(0, 1 - mon.distancia / 12) : 0;
+  const chiado = 0.05 + perto * 0.18 + (mon.sendoVisto && ativo ? 0.05 : 0) + (apagao.duracao > 0 ? 0.25 : 0);
+  document.getElementById("ruido").style.opacity = chiado;
+  document.getElementById("flashVermelho").style.opacity = perto * 0.45;
+  // placas neon piscando sozinhas (e todas apagam no apagão)
+  placasPiscando.forEach(m => { m.opacity = apagao.duracao > 0 ? 0.05 : (Math.random() < 0.03 ? 0.2 : 1); });
+  luzesNeon.forEach(l => { l.intensity = apagao.duracao > 0 ? 0 : (Math.random() < 0.04 ? 0.1 : 0.7); });
+  if (tempoMensagem > 0) { tempoMensagem -= dt; if (tempoMensagem <= 0) document.getElementById("mensagem").textContent = ""; }
+  document.getElementById("cheioLanterna").style.width = `${jogador.lanterna * 100}%`;
+  document.getElementById("cheioFolego").style.width = `${jogador.folego * 100}%`;
+}
+
+// ===== Fim de jogo =====
+let tempoSusto = 0;
+function pego() {
+  if (estado !== "jogando") return;
+  estado = "pego";
+  tempoSusto = 0;
+  grito();
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+function vencer() {
+  estado = "fim";
+  pararAmbiente();
+  if (document.pointerLockElement) document.exitPointerLock();
+  const r = lerRecorde(mapaEscolhido);
+  let extra = "";
+  if (!r || tempo < r) { salvarRecorde(mapaEscolhido, Math.round(tempo)); extra = "<br>🏆 Nova fuga mais rápida neste mapa!"; }
+  document.getElementById("tituloFim").innerHTML = '<span style="color:#39ff88">VOCÊ ESCAPOU!</span>';
+  document.getElementById("textoFim").innerHTML = `Você saiu do ${MAPAS[mapaEscolhido].nome} em <b>${formatar(tempo)}</b>.<br>Lá dentro, as telas voltam a mostrar: GAME OVER.${extra}`;
+  document.getElementById("hud").classList.add("escondido");
+  mostrarTela("fim");
+}
+
+function mostrarDerrota() {
+  estado = "fim";
+  pararAmbiente();
+  document.getElementById("susto").style.opacity = 0;
+  document.getElementById("tituloFim").innerHTML = '<span style="color:#ff2a4a">O PIXEL TE PEGOU</span>';
+  document.getElementById("textoFim").innerHTML = `Você achou <b>${fusiveis}/5</b> fusíveis em ${formatar(tempo)}.<br>Dica: ande de costas quando ele estiver perto e não deixe a lanterna acabar.`;
+  document.getElementById("hud").classList.add("escondido");
+  mostrarTela("fim");
+}
+
+// ===== Sons (todos gerados pelo navegador) =====
+let audio = null, ruidoBuf = null, ambiente = [];
+function ctxAudio() {
+  if (!audio) {
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    ruidoBuf = audio.createBuffer(1, audio.sampleRate * 2, audio.sampleRate);
+    const d = ruidoBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (audio.state === "suspended") audio.resume();
+  return audio;
+}
+function tom(f, dur, tipo = "sine", vol = 0.1, atraso = 0, pan = 0) {
+  const a = ctxAudio(), t = a.currentTime + atraso;
+  const o = a.createOscillator(), g = a.createGain(), p = a.createStereoPanner();
+  o.type = tipo; o.frequency.value = f; p.pan.value = pan;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(p).connect(a.destination);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function ruidoCurto(dur, filtro, freqF, vol, pan = 0) {
+  const a = ctxAudio(), t = a.currentTime;
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(), p = a.createStereoPanner();
+  s.buffer = ruidoBuf; f.type = filtro; f.frequency.value = freqF; p.pan.value = pan;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f).connect(g).connect(p).connect(a.destination);
+  s.start(t, Math.random()); s.stop(t + dur + 0.05);
+}
+function somPasso(vol) { ruidoCurto(0.08, "lowpass", 500, vol); }
+function somMonstro() {
+  if (mon.distancia > 26) return;
+  const vol = 0.35 * (1 - mon.distancia / 26);
+  const dir = new THREE.Vector3(mon.pos.x - jogador.pos.x, 0, mon.pos.z - jogador.pos.z).normalize();
+  const pan = dir.dot(new THREE.Vector3(Math.cos(jogador.yaw), 0, -Math.sin(jogador.yaw)));
+  ruidoCurto(0.12, "bandpass", 900, vol, pan);       // passo metálico
+  tom(85 + Math.random() * 20, 0.12, "square", vol * 0.4, 0, pan);
+}
+function coracao() {
+  tom(55, 0.12, "sine", 0.35);
+  tom(48, 0.14, "sine", 0.28, 0.16);
+}
+function zumbido() { tom(60, 1.3, "square", 0.06); ruidoCurto(1.2, "bandpass", 120, 0.15); }
+function grito() {
+  const a = ctxAudio(), t = a.currentTime;
+  ruidoCurto(1.3, "highpass", 1200, 0.6);
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = "sawtooth";
+  o.frequency.setValueAtTime(420, t);
+  o.frequency.exponentialRampToValueAtTime(70, t + 1.2);
+  g.gain.setValueAtTime(0.35, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+  o.connect(g).connect(a.destination);
+  o.start(t); o.stop(t + 1.4);
+}
+function iniciarAmbiente() {
+  const a = ctxAudio();
+  pararAmbiente();
+  // zumbido grave das máquinas desligadas + vento
+  [55, 55.6, 82.4].forEach((f, i) => {
+    const o = a.createOscillator(), filtro = a.createBiquadFilter(), g = a.createGain();
+    o.type = "sawtooth"; o.frequency.value = f;
+    filtro.type = "lowpass"; filtro.frequency.value = 180;
+    g.gain.value = i === 2 ? 0.015 : 0.03;
+    o.connect(filtro).connect(g).connect(a.destination);
+    o.start();
+    ambiente.push(o);
+  });
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = ruidoBuf; s.loop = true;
+  f.type = "bandpass"; f.frequency.value = 350; f.Q.value = 0.6;
+  g.gain.value = 0.035;
+  s.connect(f).connect(g).connect(a.destination);
+  s.start();
+  ambiente.push(s);
+}
+function pararAmbiente() { ambiente.forEach(o => { try { o.stop(); } catch (e) {} }); ambiente = []; }
+
+// musiquinha distorcida de fliperama tocando sozinha de vez em quando
+let tempoJingle = 12;
+function jingleAssustador(dt) {
+  tempoJingle -= dt;
+  if (tempoJingle > 0) return;
+  tempoJingle = 18 + Math.random() * 20;
+  [523, 494, 466, 440, 392].forEach((f, i) => tom(f * (0.97 + Math.random() * 0.03), 0.22, "square", 0.025, i * 0.22, (Math.random() - 0.5)));
+}
+
+// ===== Controles =====
+document.addEventListener("keydown", e => {
+  teclas[e.code] = true;
+  if (estado !== "jogando") return;
+  if (e.code === "KeyF" && jogador.lanterna > 0) { jogador.ligada = !jogador.ligada; tom(1800, 0.03, "square", 0.05); }
+  if (e.code === "KeyP") pausar();
+});
+document.addEventListener("keyup", e => teclas[e.code] = false);
+document.addEventListener("mousemove", e => {
+  if (estado !== "jogando" || document.pointerLockElement !== renderer.domElement) return;
+  jogador.yaw -= e.movementX * 0.0022;
+  jogador.pitch = Math.max(-1.3, Math.min(1.3, jogador.pitch - e.movementY * 0.0022));
+});
+renderer.domElement.addEventListener("click", () => { if (estado === "jogando" && !document.pointerLockElement) travar(); });
+document.addEventListener("pointerlockchange", () => { if (!document.pointerLockElement && estado === "jogando") pausar(); });
+
+function pausar() {
+  estado = "pausado";
+  teclas = {};
+  if (audio) audio.suspend();
+  mostrarTela("pausa");
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+function continuar() {
+  estado = "jogando";
+  if (audio) audio.resume();
+  mostrarTela(null);
+  travar();
+}
+function irMenu() {
+  estado = "menu";
+  pararAmbiente();
+  if (audio) audio.resume();
+  itens.forEach(i => cena.remove(i.grupo));
+  itens = [];
+  mon.pos.set(-99, 0, -99);
+  document.getElementById("hud").classList.add("escondido");
+  desenharMapas();
+  mostrarTela("menu");
+}
+document.getElementById("botaoEntrar").addEventListener("click", e => { iniciar(); e.currentTarget.blur(); });
+document.getElementById("botaoDeNovo").addEventListener("click", e => { iniciar(); e.currentTarget.blur(); });
+document.getElementById("botaoContinuar").addEventListener("click", continuar);
+document.getElementById("botaoMenuPausa").addEventListener("click", irMenu);
+document.getElementById("botaoMenuFim").addEventListener("click", irMenu);
+
+// ===== Laço principal =====
+let ultimo = performance.now(), tempoTela = 0;
+function laco(agora) {
+  requestAnimationFrame(laco);
+  const dt = Math.min(0.05, (agora - ultimo) / 1000);
+  ultimo = agora;
+
+  if (estado === "jogando") {
+    tempo += dt;
+    atualizarJogador(dt);
+    atualizarApagao(dt);
+    atualizarMonstro(dt);
+    jingleAssustador(dt);
+    // batimento do coração quando ele está perto
+    if (ativo && mon.distancia < 12) {
+      tempoCoracao -= dt;
+      if (tempoCoracao <= 0) { coracao(); tempoCoracao = 0.35 + (mon.distancia / 12) * 0.6; }
+    }
+  } else if (estado === "pego") {
+    // susto: a câmera vira para o rosto dele
+    tempoSusto += dt;
+    const cabeca = new THREE.Vector3(mon.pos.x, 2.25, mon.pos.z);
+    const m = new THREE.Matrix4().lookAt(camera.position, cabeca, new THREE.Vector3(0, 1, 0));
+    const q = new THREE.Quaternion().setFromRotationMatrix(m);
+    camera.quaternion.slerp(q, Math.min(1, dt * 18));
+    camera.position.y = 1.6 + (Math.random() - 0.5) * 0.06;
+    monstro.grupo.rotation.z = (Math.random() - 0.5) * 0.3;
+    document.getElementById("ruido").style.opacity = 0.5;
+    if (tempoSusto > 1.2) document.getElementById("susto").style.opacity = Math.min(1, (tempoSusto - 1.2) * 3);
+    if (tempoSusto > 1.7) mostrarDerrota();
+  }
+
+  monstro.grupo.position.set(mon.pos.x, 0, mon.pos.z);
+  tempoTela += dt;
+  if (tempoTela > 0.12) { tempoTela = 0; atualizarTela(); }
+  if (estado !== "pego") atualizarEfeitos(dt);
+
+  if (estado === "menu") {
+    // menu: câmera parada na entrada do mapa escolhido, olhando em volta devagar
+    const a = agora / 6000;
+    const p = centroDe(...inicio);
+    camera.position.set(p.x, 1.6, p.z);
+    camera.rotation.set(0.05, a * 0.6, 0);
+    lanterna.intensity = 1.6;
+  }
+  renderer.render(cena, camera);
+}
+
+desenharMapas();
+construirNivel(MAPAS[mapaEscolhido]);
+requestAnimationFrame(laco);
+</script>
+</body>
+</html>

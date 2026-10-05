@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Invasores Espaciais · Fliperama Neon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fundo: #0b0820; --painel: #151033; --borda: #2e2766; --texto: #f1eeff; --suave: #a39fd0;
+    --ciano: #00f0ff; --rosa: #ff2bd6; --amarelo: #ffe600; --verde: #39ff88;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% 0%, #2a1460, var(--fundo) 65%);
+    color: var(--texto); font-family: "Segoe UI", Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 16px 24px;
+    user-select: none; -webkit-user-select: none; touch-action: manipulation;
+  }
+  .topo { width: 100%; max-width: 520px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .voltar { color: var(--suave); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--borda); padding: 6px 10px; border-radius: 8px; }
+  .voltar:hover { color: var(--ciano); border-color: var(--ciano); }
+  h1 { font-family: "Press Start 2P", monospace; font-size: 0.8rem; color: var(--verde); text-shadow: 0 0 8px var(--verde); }
+  .placar { display: flex; gap: 12px; font-size: 0.75rem; color: var(--suave); }
+  .placar b { color: var(--amarelo); font-size: 1rem; }
+  main { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+  .area { position: relative; border: 2px solid var(--verde); border-radius: 10px; box-shadow: 0 0 18px rgba(57, 255, 136, 0.35); background: #06041a; line-height: 0; }
+  canvas { display: block; width: min(92vw, 480px, 60vh); height: auto; border-radius: 8px; }
+  .aviso { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(6, 4, 26, 0.85); text-align: center; padding: 16px; line-height: 1.4; border-radius: 8px; }
+  .aviso.escondido { display: none; }
+  .aviso h2 { font-family: "Press Start 2P", monospace; font-size: 0.95rem; color: var(--rosa); text-shadow: 0 0 10px var(--rosa); line-height: 1.5; }
+  .aviso p { color: var(--suave); font-size: 0.9rem; }
+  .botao { background: transparent; color: var(--verde); border: 2px solid var(--verde); border-radius: 8px; padding: 10px 22px; font-weight: 800; font-size: 1rem; cursor: pointer; }
+  .controles { display: flex; gap: 10px; }
+  .controles button { width: 80px; height: 60px; background: var(--painel); color: var(--verde); border: 1px solid var(--borda); border-radius: 12px; font-size: 1.4rem; font-weight: 900; }
+  .controles button.fogo { width: 110px; color: var(--rosa); font-size: 0.9rem; }
+  .controles button:active { background: rgba(57, 255, 136, 0.25); }
+  .dica { font-size: 0.75rem; color: var(--suave); text-align: center; }
+  @media (pointer: fine) { .controles { display: none; } }
+</style>
+</head>
+<body>
+<header class="topo">
+  <a href="fliperama-neon.html" class="voltar">← Fliperama</a>
+  <h1>INVASORES ESPACIAIS</h1>
+  <div class="placar"><span>PONTOS <b id="pontos">0</b></span><span>RECORDE <b id="recorde">0</b></span></div>
+</header>
+
+<main>
+  <div class="area">
+    <canvas id="tela" width="480" height="560"></canvas>
+    <div class="aviso" id="aviso">
+      <h2 id="avisoTitulo">INVASORES<br>ESPACIAIS</h2>
+      <p id="avisoTexto">Defenda a Terra! Destrua todas as naves antes que elas cheguem lá embaixo.</p>
+      <button class="botao" id="botaoJogar">JOGAR</button>
+    </div>
+  </div>
+  <div class="controles">
+    <button data-tecla="esq">◀</button>
+    <button data-tecla="fogo" class="fogo">FOGO</button>
+    <button data-tecla="dir">▶</button>
+  </div>
+  <p class="dica">← → ou A/D para mover · Espaço para atirar · P pausa</p>
+</main>
+
+<script>
+  const tela = document.getElementById("tela");
+  const ctx = tela.getContext("2d");
+  const L = tela.width, A = tela.height;
+  const CHAVE = "fliperama_invasores";
+
+  // Desenhos dos invasores em "pixels" (1 = pintado)
+  const SPRITES = [
+    ["00100000100", "00010001000", "00111111100", "01101110110", "11111111111", "10111111101", "10100000101", "00011011000"],
+    ["00001110000", "01111111110", "11111111111", "11100100111", "11111111111", "00011011000", "00110110100", "11000000011"],
+    ["00011111000", "00111111100", "01101110110", "01111111110", "00101110100", "01000000010", "00100000100", "00000000000"]
+  ];
+  const CORES_LINHA = ["#ff2bd6", "#b06bff", "#00f0ff", "#00f0ff", "#39ff88"];
+  const PONTOS_LINHA = [40, 30, 20, 20, 10];
+
+  let nave, tiros, tirosInimigos, invasores, direcao, velInvasor, pontos, vidas, onda, estado = "parado", pausado = false;
+  let ultimo = 0, ultimoTiro = -1e9, teclas = {}, explosoes = [], invencivel = 0;
+  let recorde = ler();
+  document.getElementById("recorde").textContent = recorde;
+
+  function ler() { try { return Number(localStorage.getItem(CHAVE)) || 0; } catch (e) { return 0; } }
+  function salvar(v) { try { localStorage.setItem(CHAVE, v); } catch (e) {} }
+
+  let audio = null;
+  function bip(freq, dur, tipo = "square", vol = 0.04, freqFim) {
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = tipo; o.frequency.setValueAtTime(freq, audio.currentTime);
+      if (freqFim) o.frequency.exponentialRampToValueAtTime(freqFim, audio.currentTime + dur);
+      g.gain.setValueAtTime(vol, audio.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + dur);
+      o.connect(g).connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + dur);
+    } catch (e) {}
+  }
+
+  function iniciar() {
+    nave = { x: L / 2, y: A - 40 };
+    pontos = 0;
+    vidas = 3;
+    onda = 0;
+    estado = "jogando";
+    pausado = false;
+    document.getElementById("pontos").textContent = 0;
+    document.getElementById("aviso").classList.add("escondido");
+    novaOnda();
+  }
+
+  function novaOnda() {
+    onda++;
+    tiros = [];
+    tirosInimigos = [];
+    invasores = [];
+    for (let l = 0; l < 5; l++) for (let c = 0; c < 8; c++) {
+      invasores.push({ x: 50 + c * 48, y: 70 + l * 38, linha: l, vivo: true });
+    }
+    direcao = 1;
+    velInvasor = 22 + onda * 6; // cada onda vem mais rápida
+  }
+
+  function laco(agora) {
+    const dt = Math.min(0.033, (agora - ultimo) / 1000 || 0);
+    ultimo = agora;
+    if (estado === "jogando" && !pausado) atualizar(dt);
+    desenhar(agora);
+    requestAnimationFrame(laco);
+  }
+
+  function atirar() {
+    const agora = performance.now();
+    if (estado !== "jogando" || pausado || agora - ultimoTiro < 380 || tiros.length >= 2) return;
+    ultimoTiro = agora;
+    tiros.push({ x: nave.x, y: nave.y - 16 });
+    bip(900, 0.1, "square", 0.04, 300);
+  }
+
+  function atualizar(dt) {
+    // nave
+    if (teclas.esq) nave.x -= 260 * dt;
+    if (teclas.dir) nave.x += 260 * dt;
+    nave.x = Math.max(20, Math.min(L - 20, nave.x));
+    if (teclas.fogo) atirar();
+    invencivel = Math.max(0, invencivel - dt);
+
+    // tiros do jogador
+    tiros.forEach(t => t.y -= 480 * dt);
+    tiros = tiros.filter(t => t.y > -10);
+
+    // invasores: andam de lado e descem ao bater na borda; aceleram quando sobram poucos
+    const vivos = invasores.filter(i => i.vivo);
+    const vel = velInvasor * (1 + (40 - vivos.length) / 20);
+    let bateuBorda = false;
+    vivos.forEach(i => {
+      i.x += direcao * vel * dt;
+      if (i.x < 18 || i.x > L - 18) bateuBorda = true;
+    });
+    if (bateuBorda) {
+      direcao *= -1;
+      vivos.forEach(i => { i.y += 10; i.x += direcao * 4; });
+    }
+
+    // acertos
+    for (const t of tiros) {
+      for (const i of vivos) {
+        if (i.vivo && Math.abs(t.x - i.x) < 17 && Math.abs(t.y - i.y) < 13) {
+          i.vivo = false;
+          t.y = -100;
+          pontos += PONTOS_LINHA[i.linha] * onda;
+          document.getElementById("pontos").textContent = pontos;
+          explosoes.push({ x: i.x, y: i.y, vida: 0.3, cor: CORES_LINHA[i.linha] });
+          bip(200, 0.15, "sawtooth", 0.05, 60);
+          break;
+        }
+      }
+    }
+
+    // invasores da frente atiram de vez em quando
+    if (vivos.length && Math.random() < dt * (0.9 + onda * 0.25)) {
+      const colunas = {};
+      vivos.forEach(i => {
+        const k = Math.round(i.x / 10);
+        if (!colunas[k] || colunas[k].y < i.y) colunas[k] = i;
+      });
+      const frente = Object.values(colunas);
+      const quem = frente[Math.floor(Math.random() * frente.length)];
+      tirosInimigos.push({ x: quem.x, y: quem.y + 12 });
+    }
+    tirosInimigos.forEach(t => t.y += (200 + onda * 15) * dt);
+    tirosInimigos = tirosInimigos.filter(t => t.y < A + 10);
+
+    // jogador atingido
+    if (invencivel <= 0) {
+      for (const t of tirosInimigos) {
+        if (Math.abs(t.x - nave.x) < 18 && Math.abs(t.y - nave.y) < 12) {
+          t.y = A + 100;
+          perderVida();
+          break;
+        }
+      }
+    }
+
+    explosoes.forEach(e => e.vida -= dt);
+    explosoes = explosoes.filter(e => e.vida > 0);
+
+    if (vivos.some(i => i.y > nave.y - 30)) return fim("ELES CHEGARAM!");
+    if (!invasores.some(i => i.vivo)) {
+      [523, 659, 784].forEach((f, i) => setTimeout(() => bip(f, 0.12), i * 100));
+      novaOnda();
+    }
+  }
+
+  function perderVida() {
+    vidas--;
+    invencivel = 1.5;
+    explosoes.push({ x: nave.x, y: nave.y, vida: 0.5, cor: "#ffe600" });
+    bip(120, 0.5, "sawtooth", 0.08, 40);
+    if (vidas <= 0) fim("SUA NAVE CAIU!");
+  }
+
+  function fim(titulo) {
+    estado = "fim";
+    let texto = `Você fez ${pontos} pontos e chegou na onda ${onda}.`;
+    if (pontos > recorde) {
+      recorde = pontos;
+      salvar(recorde);
+      document.getElementById("recorde").textContent = recorde;
+      texto = `NOVO RECORDE: ${pontos} pontos! 🏆`;
+    }
+    document.getElementById("avisoTitulo").textContent = titulo;
+    document.getElementById("avisoTexto").textContent = texto;
+    document.getElementById("botaoJogar").textContent = "JOGAR DE NOVO";
+    document.getElementById("aviso").classList.remove("escondido");
+  }
+
+  const estrelas = Array.from({ length: 70 }, () => ({ x: Math.random() * L, y: Math.random() * A, r: Math.random() * 1.4 + 0.2 }));
+
+  function desenharSprite(sprite, x, y, cor, px) {
+    ctx.fillStyle = cor;
+    const w = sprite[0].length * px, h = sprite.length * px;
+    sprite.forEach((linha, l) => {
+      for (let c = 0; c < linha.length; c++) if (linha[c] === "1") ctx.fillRect(x - w / 2 + c * px, y - h / 2 + l * px, px, px);
+    });
+  }
+
+  function desenhar(agora) {
+    ctx.fillStyle = "#06041a";
+    ctx.fillRect(0, 0, L, A);
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    estrelas.forEach(s => {
+      s.y = (s.y + 0.15) % A;
+      ctx.fillRect(s.x, s.y, s.r, s.r);
+    });
+
+    if (invasores) {
+      ctx.shadowBlur = 10;
+      const anim = Math.floor((agora || 0) / 400) % 2; // "bate as patas"
+      invasores.forEach(i => {
+        if (!i.vivo) return;
+        ctx.shadowColor = CORES_LINHA[i.linha];
+        const sprite = SPRITES[[0, 1, 1, 2, 2][i.linha]];
+        desenharSprite(anim ? sprite : sprite.slice().reverse(), i.x, i.y, CORES_LINHA[i.linha], 3);
+      });
+    }
+
+    // nave do jogador (pisca quando está invencível)
+    if (nave && !(invencivel > 0 && Math.floor(agora / 100) % 2)) {
+      ctx.shadowBlur = 14;
+      ctx.shadowColor = ctx.fillStyle = "#39ff88";
+      ctx.beginPath();
+      ctx.moveTo(nave.x, nave.y - 16);
+      ctx.lineTo(nave.x + 18, nave.y + 10);
+      ctx.lineTo(nave.x - 18, nave.y + 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillRect(nave.x - 3, nave.y - 22, 6, 10);
+    }
+
+    if (tiros) {
+      ctx.shadowColor = ctx.fillStyle = "#ffe600";
+      tiros.forEach(t => ctx.fillRect(t.x - 2, t.y - 8, 4, 14));
+      ctx.shadowColor = ctx.fillStyle = "#ff2bd6";
+      tirosInimigos.forEach(t => {
+        ctx.fillRect(t.x - 2, t.y - 6, 4, 4);
+        ctx.fillRect(t.x, t.y - 2, 4, 4);
+        ctx.fillRect(t.x - 2, t.y + 2, 4, 4);
+      });
+    }
+
+    explosoes.forEach(e => {
+      ctx.shadowColor = ctx.fillStyle = e.cor;
+      const r = (0.5 - e.vida) * 60 + 6;
+      for (let k = 0; k < 8; k++) {
+        const a = k * Math.PI / 4;
+        ctx.fillRect(e.x + Math.cos(a) * r - 2, e.y + Math.sin(a) * r - 2, 4, 4);
+      }
+    });
+    ctx.shadowBlur = 0;
+
+    // vidas e onda
+    if (estado !== "parado") {
+      ctx.font = "12px 'Press Start 2P', monospace";
+      ctx.fillStyle = "#a39fd0";
+      ctx.textAlign = "left";
+      ctx.fillText(`ONDA ${onda}`, 12, 24);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#39ff88";
+      ctx.fillText("▲ ".repeat(Math.max(0, vidas)).trim(), L - 12, 24);
+    }
+    // chão
+    ctx.fillStyle = "#39ff88";
+    ctx.fillRect(0, A - 14, L, 2);
+  }
+
+  const MAPA = { ArrowLeft: "esq", KeyA: "esq", ArrowRight: "dir", KeyD: "dir", Space: "fogo" };
+  document.addEventListener("keydown", e => {
+    if (MAPA[e.code]) { e.preventDefault(); teclas[MAPA[e.code]] = true; }
+    if (MAPA[e.code] === "fogo") atirar();
+    if (e.code === "KeyP" && estado === "jogando") {
+      pausado = !pausado;
+      document.getElementById("avisoTitulo").textContent = "PAUSADO";
+      document.getElementById("avisoTexto").textContent = "Aperte P para continuar";
+      document.getElementById("botaoJogar").style.display = pausado ? "none" : "";
+      document.getElementById("aviso").classList.toggle("escondido", !pausado);
+    }
+    if (e.code === "Enter" && estado !== "jogando") iniciar();
+  });
+  document.addEventListener("keyup", e => { if (MAPA[e.code]) teclas[MAPA[e.code]] = false; });
+
+  // botões de toque: segurar para continuar movendo/atirando
+  document.querySelectorAll(".controles button").forEach(b => {
+    const k = b.dataset.tecla;
+    b.addEventListener("pointerdown", e => { e.preventDefault(); teclas[k] = true; if (k === "fogo") atirar(); });
+    ["pointerup", "pointerleave", "pointercancel"].forEach(ev => b.addEventListener(ev, () => teclas[k] = false));
+  });
+
+  document.getElementById("botaoJogar").addEventListener("click", e => { iniciar(); e.currentTarget.blur(); });
+
+  requestAnimationFrame(laco);
+</script>
+</body>
+</html>

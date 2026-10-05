@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Tetris Neon</title>
+<style>
+  :root {
+    --fundo: #07070f;
+    --painel: #10101e;
+    --borda: #2a2a4a;
+    --texto: #e6e6ff;
+    --suave: #8a8ab0;
+    --destaque: #00f0ff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% 0%, #1a1035 0%, var(--fundo) 60%);
+    color: var(--texto);
+    font-family: "Segoe UI", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .voltar-fliperama { align-self: flex-start; color: var(--suave); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--borda); padding: 6px 12px; border-radius: 8px; margin-bottom: 8px; }
+  .voltar-fliperama:hover { color: var(--destaque); border-color: var(--destaque); }
+
+  h1 {
+    font-size: 2rem;
+    letter-spacing: 6px;
+    margin-bottom: 16px;
+    color: var(--destaque);
+    text-shadow: 0 0 8px var(--destaque), 0 0 24px #ff00e6;
+  }
+
+  .jogo {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .lateral {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 130px;
+  }
+
+  .caixa {
+    background: var(--painel);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.08);
+  }
+
+  .caixa h2 {
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    color: var(--suave);
+    margin-bottom: 6px;
+  }
+
+  .caixa .valor {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: var(--texto);
+  }
+
+  .caixa canvas { display: block; margin: 0 auto; }
+
+  .tabuleiro {
+    position: relative;
+    border: 2px solid var(--destaque);
+    border-radius: 6px;
+    box-shadow: 0 0 16px rgba(0, 240, 255, 0.5), inset 0 0 24px rgba(0, 240, 255, 0.1);
+    background: #05050b;
+  }
+
+  #tela { display: block; }
+
+  .aviso {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: rgba(5, 5, 11, 0.85);
+    text-align: center;
+    padding: 16px;
+  }
+
+  .aviso.escondido { display: none; }
+
+  .aviso h3 {
+    font-size: 1.6rem;
+    color: #ff00e6;
+    text-shadow: 0 0 10px #ff00e6;
+  }
+
+  .aviso p { color: var(--suave); font-size: 0.9rem; }
+
+  .botao {
+    background: transparent;
+    color: var(--destaque);
+    border: 2px solid var(--destaque);
+    border-radius: 8px;
+    padding: 10px 22px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    text-shadow: 0 0 6px var(--destaque);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+  }
+
+  .botao:hover { background: rgba(0, 240, 255, 0.12); }
+
+  .teclas {
+    font-size: 0.75rem;
+    color: var(--suave);
+    line-height: 1.7;
+    text-align: left;
+  }
+
+  .teclas b { color: var(--texto); }
+
+  /* Controles de toque (aparecem em telas pequenas) */
+  .controles {
+    display: none;
+    margin-top: 16px;
+    gap: 8px;
+    grid-template-columns: repeat(4, 64px);
+    justify-content: center;
+  }
+
+  .controles button {
+    height: 56px;
+    font-size: 1.3rem;
+    background: var(--painel);
+    color: var(--destaque);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    touch-action: manipulation;
+  }
+
+  .controles button:active { background: rgba(0, 240, 255, 0.2); }
+
+  .controles .largo { grid-column: span 2; font-size: 0.9rem; font-weight: bold; }
+
+  /* Botões de música e sons */
+  .audio {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .audio button {
+    background: var(--painel);
+    color: var(--texto);
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .audio button.desligado { color: var(--suave); opacity: 0.6; }
+
+  /* Player do YouTube invisível: fica dentro da tela (senão o YouTube não toca),
+     mas transparente e sem receber cliques, então só a música aparece */
+  #ytPlayer {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    width: 200px;
+    height: 113px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  #ytPlayer.escondido { display: none; }
+
+  @media (max-width: 640px), (pointer: coarse) {
+    h1 { font-size: 1.4rem; margin-bottom: 10px; }
+    .jogo { gap: 8px; }
+    .lateral { width: 80px; gap: 8px; }
+    .caixa { padding: 6px; }
+    .caixa .valor { font-size: 1rem; }
+    .teclas { display: none; }
+    .controles { display: grid; }
+    .lateral { width: 72px; }
+    .caixa canvas { width: 100%; height: auto; }
+    .caixa h2 { font-size: 0.6rem; letter-spacing: 1px; }
+    #tela { width: min(240px, calc(100vw - 32px - 160px)); height: auto; }
+  }
+</style>
+</head>
+<body>
+
+<a href="fliperama-neon.html" class="voltar-fliperama">← Fliperama</a>
+<h1>TETRIS NEON</h1>
+
+<div class="jogo">
+  <div class="lateral">
+    <div class="caixa">
+      <h2>GUARDADA</h2>
+      <canvas id="telaGuardada" width="100" height="80"></canvas>
+    </div>
+    <div class="caixa">
+      <h2>PONTOS</h2>
+      <div class="valor" id="pontos">0</div>
+    </div>
+    <div class="caixa">
+      <h2>RECORDE</h2>
+      <div class="valor" id="recorde">0</div>
+    </div>
+  </div>
+
+  <div class="tabuleiro">
+    <canvas id="tela" width="240" height="480"></canvas>
+    <div class="aviso" id="aviso">
+      <h3 id="avisoTitulo">TETRIS NEON</h3>
+      <p id="avisoTexto">Encaixe as peças e complete linhas!</p>
+      <button class="botao" id="botaoJogar">JOGAR</button>
+    </div>
+  </div>
+
+  <div class="lateral">
+    <div class="caixa">
+      <h2>PRÓXIMA</h2>
+      <canvas id="telaProxima" width="100" height="80"></canvas>
+    </div>
+    <div class="caixa">
+      <h2>NÍVEL</h2>
+      <div class="valor" id="nivel">1</div>
+    </div>
+    <div class="caixa">
+      <h2>LINHAS</h2>
+      <div class="valor" id="linhas">0</div>
+    </div>
+    <div class="caixa teclas">
+      <b>← →</b> mover<br>
+      <b>↑</b> girar<br>
+      <b>↓</b> descer<br>
+      <b>Espaço</b> soltar<br>
+      <b>C</b> guardar<br>
+      <b>P</b> pausar<br>
+      <b>M</b> música<br>
+      <b>N</b> sons
+    </div>
+  </div>
+</div>
+
+<div class="controles">
+  <button data-acao="esquerda">←</button>
+  <button data-acao="girar">⟳</button>
+  <button data-acao="direita">→</button>
+  <button data-acao="descer">↓</button>
+  <button data-acao="soltar" class="largo">SOLTAR</button>
+  <button data-acao="guardar">C</button>
+  <button data-acao="pausar">II</button>
+</div>
+
+<div class="audio">
+  <button id="botaoMusica">🎵 Música: ligada</button>
+  <button id="botaoSons">🔊 Sons: ligados</button>
+</div>
+
+<div id="ytPlayer"></div>
+
+<script>
+  // ===== Configuração =====
+  const COLUNAS = 10;
+  const LINHAS = 20;
+  const TAMANHO = 24; // tamanho de cada quadradinho em pixels
+
+  // As 7 peças do Tetris e suas cores neon
+  const PECAS = {
+    I: { cor: "#00f0ff", forma: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]] },
+    O: { cor: "#ffe600", forma: [[1,1],[1,1]] },
+    T: { cor: "#c000ff", forma: [[0,1,0],[1,1,1],[0,0,0]] },
+    S: { cor: "#00ff6a", forma: [[0,1,1],[1,1,0],[0,0,0]] },
+    Z: { cor: "#ff2050", forma: [[1,1,0],[0,1,1],[0,0,0]] },
+    J: { cor: "#2060ff", forma: [[1,0,0],[1,1,1],[0,0,0]] },
+    L: { cor: "#ff8a00", forma: [[0,0,1],[1,1,1],[0,0,0]] }
+  };
+
+  // ===== Elementos da página =====
+  const tela = document.getElementById("tela");
+  const ctx = tela.getContext("2d");
+  const ctxProxima = document.getElementById("telaProxima").getContext("2d");
+  const ctxGuardada = document.getElementById("telaGuardada").getContext("2d");
+  const aviso = document.getElementById("aviso");
+  const avisoTitulo = document.getElementById("avisoTitulo");
+  const avisoTexto = document.getElementById("avisoTexto");
+  const botaoJogar = document.getElementById("botaoJogar");
+
+  // ===== Estado do jogo =====
+  let grade, peca, proxima, guardada, podeGuardar;
+  let pontos, linhasFeitas, nivel;
+  let jogando = false, pausado = false;
+  let ultimoTempo = 0, acumulado = 0;
+  let saco = [];
+  let recorde = lerRecorde();
+  document.getElementById("recorde").textContent = recorde;
+
+  function lerRecorde() {
+    try { return Number(localStorage.getItem("tetrisNeonRecorde")) || 0; }
+    catch (e) { return 0; }
+  }
+
+  function salvarRecorde() {
+    try { localStorage.setItem("tetrisNeonRecorde", recorde); } catch (e) {}
+  }
+
+  // Sorteia as peças em "sacos" de 7 para não repetir demais
+  function sortearTipo() {
+    if (saco.length === 0) {
+      saco = Object.keys(PECAS);
+      for (let i = saco.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [saco[i], saco[j]] = [saco[j], saco[i]];
+      }
+    }
+    return saco.pop();
+  }
+
+  function criarPeca(tipo) {
+    const forma = PECAS[tipo].forma.map(linha => [...linha]);
+    return {
+      tipo,
+      forma,
+      cor: PECAS[tipo].cor,
+      x: Math.floor((COLUNAS - forma[0].length) / 2),
+      y: tipo === "I" ? -1 : 0
+    };
+  }
+
+  function novaGrade() {
+    return Array.from({ length: LINHAS }, () => Array(COLUNAS).fill(null));
+  }
+
+  // Verifica se a peça bate na parede, no chão ou em outra peça
+  function colide(forma, x, y) {
+    for (let l = 0; l < forma.length; l++) {
+      for (let c = 0; c < forma[l].length; c++) {
+        if (!forma[l][c]) continue;
+        const nx = x + c, ny = y + l;
+        if (nx < 0 || nx >= COLUNAS || ny >= LINHAS) return true;
+        if (ny >= 0 && grade[ny][nx]) return true;
+      }
+    }
+    return false;
+  }
+
+  function girarForma(forma) {
+    const n = forma.length;
+    return forma.map((linha, l) => linha.map((_, c) => forma[n - 1 - c][l]));
+  }
+
+  function girar() {
+    if (peca.tipo === "O") return;
+    const nova = girarForma(peca.forma);
+    // Tenta girar no lugar; se bater, empurra um pouco para os lados ("wall kick")
+    for (const desvio of [0, -1, 1, -2, 2]) {
+      if (!colide(nova, peca.x + desvio, peca.y)) {
+        peca.forma = nova;
+        peca.x += desvio;
+        som("girar");
+        return;
+      }
+    }
+  }
+
+  function mover(dx) {
+    if (!colide(peca.forma, peca.x + dx, peca.y)) {
+      peca.x += dx;
+      som("mover");
+    }
+  }
+
+  // Desce uma linha; se não der, fixa a peça
+  function descer() {
+    if (!colide(peca.forma, peca.x, peca.y + 1)) {
+      peca.y++;
+      return true;
+    }
+    fixar();
+    return false;
+  }
+
+  function soltar() {
+    let distancia = 0;
+    while (!colide(peca.forma, peca.x, peca.y + 1)) {
+      peca.y++;
+      distancia++;
+    }
+    pontos += distancia * 2;
+    som("soltar");
+    fixar();
+  }
+
+  function guardar() {
+    if (!podeGuardar) return;
+    const tipoAtual = peca.tipo;
+    if (guardada) {
+      peca = criarPeca(guardada);
+    } else {
+      peca = criarPeca(proxima);
+      proxima = sortearTipo();
+    }
+    guardada = tipoAtual;
+    podeGuardar = false;
+    som("guardar");
+  }
+
+  function fixar() {
+    let fora = false;
+    peca.forma.forEach((linha, l) => {
+      linha.forEach((valor, c) => {
+        if (!valor) return;
+        const ny = peca.y + l;
+        if (ny < 0) fora = true;
+        else grade[ny][peca.x + c] = peca.cor;
+      });
+    });
+
+    if (fora) return fimDeJogo();
+
+    limparLinhas();
+    peca = criarPeca(proxima);
+    proxima = sortearTipo();
+    podeGuardar = true;
+
+    if (colide(peca.forma, peca.x, peca.y)) fimDeJogo();
+  }
+
+  function limparLinhas() {
+    let limpas = 0;
+    for (let l = LINHAS - 1; l >= 0; l--) {
+      if (grade[l].every(celula => celula)) {
+        grade.splice(l, 1);
+        grade.unshift(Array(COLUNAS).fill(null));
+        limpas++;
+        l++; // confere a mesma linha de novo, pois tudo desceu
+      }
+    }
+    if (limpas === 0) return som("encaixe");
+
+    const tabela = [0, 100, 300, 500, 800];
+    pontos += tabela[limpas] * nivel;
+    linhasFeitas += limpas;
+    const nivelAntes = nivel;
+    nivel = Math.floor(linhasFeitas / 10) + 1;
+    som(limpas === 4 ? "tetris" : "linha");
+    if (nivel > nivelAntes) setTimeout(() => som("nivel"), 350);
+  }
+
+  // Velocidade da queda: fica mais rápida a cada nível
+  function intervalo() {
+    return Math.max(80, 800 - (nivel - 1) * 70);
+  }
+
+  // ===== Desenho =====
+  function desenharBloco(contexto, x, y, cor, tamanho) {
+    contexto.fillStyle = cor;
+    contexto.shadowColor = cor;
+    contexto.shadowBlur = 12;
+    contexto.fillRect(x + 1, y + 1, tamanho - 2, tamanho - 2);
+    contexto.shadowBlur = 0;
+    // brilho no topo do bloco
+    contexto.fillStyle = "rgba(255, 255, 255, 0.25)";
+    contexto.fillRect(x + 3, y + 3, tamanho - 6, 4);
+  }
+
+  function desenhar() {
+    ctx.clearRect(0, 0, tela.width, tela.height);
+
+    // linhas da grade
+    ctx.strokeStyle = "rgba(0, 240, 255, 0.06)";
+    for (let c = 1; c < COLUNAS; c++) {
+      ctx.beginPath(); ctx.moveTo(c * TAMANHO, 0); ctx.lineTo(c * TAMANHO, tela.height); ctx.stroke();
+    }
+    for (let l = 1; l < LINHAS; l++) {
+      ctx.beginPath(); ctx.moveTo(0, l * TAMANHO); ctx.lineTo(tela.width, l * TAMANHO); ctx.stroke();
+    }
+
+    // peças já fixadas
+    grade.forEach((linha, l) => linha.forEach((cor, c) => {
+      if (cor) desenharBloco(ctx, c * TAMANHO, l * TAMANHO, cor, TAMANHO);
+    }));
+
+    // peça fantasma: mostra onde a peça vai cair
+    let yFantasma = peca.y;
+    while (!colide(peca.forma, peca.x, yFantasma + 1)) yFantasma++;
+    ctx.strokeStyle = peca.cor;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 2;
+    peca.forma.forEach((linha, l) => linha.forEach((valor, c) => {
+      if (valor && yFantasma + l >= 0) {
+        ctx.strokeRect((peca.x + c) * TAMANHO + 3, (yFantasma + l) * TAMANHO + 3, TAMANHO - 6, TAMANHO - 6);
+      }
+    }));
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+
+    // peça caindo
+    peca.forma.forEach((linha, l) => linha.forEach((valor, c) => {
+      if (valor && peca.y + l >= 0) {
+        desenharBloco(ctx, (peca.x + c) * TAMANHO, (peca.y + l) * TAMANHO, peca.cor, TAMANHO);
+      }
+    }));
+
+    desenharMiniatura(ctxProxima, proxima);
+    desenharMiniatura(ctxGuardada, guardada, !podeGuardar);
+
+    document.getElementById("pontos").textContent = pontos;
+    document.getElementById("nivel").textContent = nivel;
+    document.getElementById("linhas").textContent = linhasFeitas;
+  }
+
+  // Desenha uma peça pequena e centralizada nas caixas laterais
+  function desenharMiniatura(contexto, tipo, apagada) {
+    const canvas = contexto.canvas;
+    contexto.clearRect(0, 0, canvas.width, canvas.height);
+    if (!tipo) return;
+
+    const forma = PECAS[tipo].forma;
+    const t = 18;
+    // pega só as linhas/colunas que têm bloco, para centralizar direito
+    const linhasUsadas = forma.map((linha, i) => linha.some(v => v) ? i : -1).filter(i => i >= 0);
+    const colunasUsadas = forma[0].map((_, i) => forma.some(linha => linha[i]) ? i : -1).filter(i => i >= 0);
+    const largura = colunasUsadas.length * t;
+    const altura = linhasUsadas.length * t;
+    const inicioX = (canvas.width - largura) / 2 - colunasUsadas[0] * t;
+    const inicioY = (canvas.height - altura) / 2 - linhasUsadas[0] * t;
+
+    contexto.globalAlpha = apagada ? 0.35 : 1;
+    forma.forEach((linha, l) => linha.forEach((valor, c) => {
+      if (valor) desenharBloco(contexto, inicioX + c * t, inicioY + l * t, PECAS[tipo].cor, t);
+    }));
+    contexto.globalAlpha = 1;
+  }
+
+  // ===== Laço principal =====
+  function laco(tempo) {
+    if (!jogando) return;
+    const delta = tempo - ultimoTempo;
+    ultimoTempo = tempo;
+
+    if (!pausado) {
+      acumulado += delta;
+      if (acumulado >= intervalo()) {
+        acumulado = 0;
+        descer();
+      }
+      if (jogando) desenhar();
+    }
+    requestAnimationFrame(laco);
+  }
+
+  function iniciar() {
+    grade = novaGrade();
+    saco = [];
+    peca = criarPeca(sortearTipo());
+    proxima = sortearTipo();
+    guardada = null;
+    podeGuardar = true;
+    pontos = 0;
+    linhasFeitas = 0;
+    nivel = 1;
+    acumulado = 0;
+    pausado = false;
+    jogando = true;
+    aviso.classList.add("escondido");
+    tocarMusica(true);
+    ultimoTempo = performance.now();
+    requestAnimationFrame(laco);
+  }
+
+  function fimDeJogo() {
+    jogando = false;
+    pararMusica();
+    som("fim");
+    desenhar();
+    if (pontos > recorde) {
+      recorde = pontos;
+      salvarRecorde();
+      document.getElementById("recorde").textContent = recorde;
+      avisoTexto.textContent = `NOVO RECORDE: ${pontos} pontos!`;
+    } else {
+      avisoTexto.textContent = `Você fez ${pontos} pontos.`;
+    }
+    avisoTitulo.textContent = "FIM DE JOGO";
+    botaoJogar.textContent = "JOGAR DE NOVO";
+    aviso.classList.remove("escondido");
+  }
+
+  function alternarPausa() {
+    if (!jogando) return;
+    pausado = !pausado;
+    if (pausado) {
+      pausarMusica();
+      avisoTitulo.textContent = "PAUSADO";
+      avisoTexto.textContent = "Aperte P para continuar";
+      botaoJogar.textContent = "CONTINUAR";
+      aviso.classList.remove("escondido");
+    } else {
+      aviso.classList.add("escondido");
+      ultimoTempo = performance.now();
+      tocarMusica(false);
+    }
+  }
+
+  // Executa uma ação do jogador (teclado ou botão de toque)
+  function acao(nome) {
+    if (nome === "pausar") return alternarPausa();
+    if (nome === "musica") return alternarMusica();
+    if (nome === "sons") return alternarSons();
+    if (!jogando || pausado) return;
+
+    if (nome === "esquerda") mover(-1);
+    else if (nome === "direita") mover(1);
+    else if (nome === "girar") girar();
+    else if (nome === "descer") { if (descer()) pontos += 1; acumulado = 0; }
+    else if (nome === "soltar") soltar();
+    else if (nome === "guardar") guardar();
+
+    if (jogando) desenhar();
+  }
+
+  // ===== Áudio =====
+  // Os efeitos são gerados pelo próprio navegador (Web Audio), sem arquivos de som.
+  let audio = null;
+  let sonsLigados = lerPreferencia("tetrisNeonSons", true);
+  let musicaLigada = lerPreferencia("tetrisNeonMusica", true);
+
+  function lerPreferencia(chave, padrao) {
+    try {
+      const valor = localStorage.getItem(chave);
+      return valor === null ? padrao : valor === "1";
+    } catch (e) { return padrao; }
+  }
+
+  function salvarPreferencia(chave, valor) {
+    try { localStorage.setItem(chave, valor ? "1" : "0"); } catch (e) {}
+  }
+
+  function iniciarAudio() {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === "suspended") audio.resume();
+  }
+
+  // Toca uma nota curta: frequência, duração, tipo de onda, volume e atraso
+  function nota(freq, duracao, tipo = "square", volume = 0.08, atraso = 0, freqFinal = null) {
+    const inicio = audio.currentTime + atraso;
+    const osc = audio.createOscillator();
+    const ganho = audio.createGain();
+    osc.type = tipo;
+    osc.frequency.setValueAtTime(freq, inicio);
+    if (freqFinal) osc.frequency.exponentialRampToValueAtTime(freqFinal, inicio + duracao);
+    ganho.gain.setValueAtTime(volume, inicio);
+    ganho.gain.exponentialRampToValueAtTime(0.0001, inicio + duracao);
+    osc.connect(ganho).connect(audio.destination);
+    osc.start(inicio);
+    osc.stop(inicio + duracao + 0.02);
+  }
+
+  function som(nome) {
+    if (!sonsLigados || !audio) return;
+    switch (nome) {
+      case "mover":   nota(220, 0.04, "square", 0.03); break;
+      case "girar":   nota(520, 0.07, "triangle", 0.08, 0, 780); break;
+      case "soltar":  nota(300, 0.15, "sawtooth", 0.07, 0, 60); break;
+      case "encaixe": nota(140, 0.08, "triangle", 0.12); break;
+      case "guardar": nota(660, 0.06, "sine", 0.1); nota(880, 0.08, "sine", 0.1, 0.06); break;
+      case "linha":
+        [523, 659, 784].forEach((f, i) => nota(f, 0.12, "square", 0.07, i * 0.06));
+        break;
+      case "tetris":
+        [523, 659, 784, 1047, 1319].forEach((f, i) => nota(f, 0.16, "square", 0.08, i * 0.07));
+        break;
+      case "nivel":
+        [392, 523, 659, 784, 1047].forEach((f, i) => nota(f, 0.1, "triangle", 0.1, i * 0.05));
+        break;
+      case "fim":
+        [392, 330, 262, 196].forEach((f, i) => nota(f, 0.3, "sawtooth", 0.07, i * 0.22));
+        break;
+    }
+  }
+
+  // ===== Música de fundo =====
+  // Tenta tocar o vídeo do YouTube escolhido. Se o YouTube bloquear
+  // (sem internet, vídeo que não permite incorporação, etc.), toca uma
+  // versão 8-bit do tema clássico do Tetris gerada pelo navegador.
+  const ID_VIDEO = "w0lUwHqF6G0";
+  let yt = null, ytPronto = false, ytFalhou = false, usandoChip = false;
+  let verificacaoYt = null;
+
+  function carregarYouTube() {
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    script.onerror = () => {
+      ytFalhou = true;
+      document.getElementById("ytPlayer").classList.add("escondido");
+    };
+    document.head.appendChild(script);
+  }
+
+  window.onYouTubeIframeAPIReady = function () {
+    yt = new YT.Player("ytPlayer", {
+      videoId: ID_VIDEO,
+      playerVars: { autoplay: 0, controls: 0, loop: 1, playlist: ID_VIDEO, playsinline: 1 },
+      events: {
+        onReady: () => { ytPronto = true; yt.setVolume(40); },
+        onError: () => { ytFalhou = true; if (musicaTocando()) trocarParaChip(); }
+      }
+    });
+  };
+
+  function musicaTocando() {
+    return musicaLigada && jogando && !pausado;
+  }
+
+  function trocarParaChip() {
+    clearTimeout(verificacaoYt);
+    if (yt && ytPronto) yt.pauseVideo();
+    usandoChip = true;
+    document.getElementById("ytPlayer").classList.add("escondido");
+    iniciarChip();
+  }
+
+  // recomecar = true volta a música para o início (novo jogo)
+  function tocarMusica(recomecar) {
+    iniciarAudio();
+    if (!musicaLigada) return;
+
+    if (!ytFalhou && !usandoChip && yt && ytPronto) {
+      if (recomecar) yt.seekTo(0, true);
+      yt.playVideo();
+      // se em 8 segundos não começou a tocar, usa a música 8-bit
+      clearTimeout(verificacaoYt);
+      verificacaoYt = setTimeout(() => {
+        const estado = yt.getPlayerState();
+        if (musicaTocando() && estado !== YT.PlayerState.PLAYING && estado !== YT.PlayerState.BUFFERING) trocarParaChip();
+      }, 8000);
+    } else {
+      usandoChip = true;
+      iniciarChip(recomecar);
+    }
+  }
+
+  function pausarMusica() {
+    clearTimeout(verificacaoYt);
+    if (yt && ytPronto && !usandoChip) yt.pauseVideo();
+    pararChip();
+  }
+
+  function pararMusica() {
+    pausarMusica();
+    posicaoChip = 0;
+  }
+
+  function alternarMusica() {
+    musicaLigada = !musicaLigada;
+    salvarPreferencia("tetrisNeonMusica", musicaLigada);
+    atualizarBotoesAudio();
+    if (musicaTocando()) tocarMusica(false);
+    else pausarMusica();
+  }
+
+  function alternarSons() {
+    sonsLigados = !sonsLigados;
+    salvarPreferencia("tetrisNeonSons", sonsLigados);
+    atualizarBotoesAudio();
+  }
+
+  function atualizarBotoesAudio() {
+    const bm = document.getElementById("botaoMusica");
+    const bs = document.getElementById("botaoSons");
+    bm.textContent = musicaLigada ? "🎵 Música: ligada" : "🎵 Música: desligada";
+    bs.textContent = sonsLigados ? "🔊 Sons: ligados" : "🔇 Sons: desligados";
+    bm.classList.toggle("desligado", !musicaLigada);
+    bs.classList.toggle("desligado", !sonsLigados);
+  }
+
+  // --- Música 8-bit de reserva (Korobeiniki, o tema do Tetris, domínio público) ---
+  const N = { A2:110, C3:131, D3:147, E3:165, G3:196, Gs3:208, A3:220, B3:247,
+              A4:440, B4:494, C5:523, D5:587, E5:659, F5:698, G5:784, A5:880, _:0 };
+  // [nota, duração em tempos]
+  const MELODIA = [
+    ["E5",1],["B4",.5],["C5",.5],["D5",1],["C5",.5],["B4",.5],
+    ["A4",1],["A4",.5],["C5",.5],["E5",1],["D5",.5],["C5",.5],
+    ["B4",1.5],["C5",.5],["D5",1],["E5",1],
+    ["C5",1],["A4",1],["A4",1],["_",1],
+    ["_",.5],["D5",1],["F5",.5],["A5",1],["G5",.5],["F5",.5],
+    ["E5",1.5],["C5",.5],["E5",1],["D5",.5],["C5",.5],
+    ["B4",1],["B4",.5],["C5",.5],["D5",1],["E5",1],
+    ["C5",1],["A4",1],["A4",1],["_",1]
+  ];
+  const BAIXO = ["E3","A2","Gs3","A2","D3","C3","E3","A2"]; // uma nota por compasso
+  const DURACAO_TOTAL = MELODIA.reduce((soma, [, d]) => soma + d, 0); // 32 tempos
+
+  let posicaoChip = 0;     // em qual tempo da música estamos
+  let proximoTempoChip = 0; // quando (no relógio do áudio) toca o próximo pedaço
+  let timerChip = null;
+
+  function iniciarChip(recomecar) {
+    pararChip();
+    if (recomecar) posicaoChip = 0;
+    proximoTempoChip = audio.currentTime + 0.1;
+    timerChip = setInterval(agendarChip, 50);
+  }
+
+  function pararChip() {
+    clearInterval(timerChip);
+    timerChip = null;
+  }
+
+  // Agenda as notas um pouquinho à frente para a música não "engasgar".
+  // A música acelera conforme o nível sobe.
+  function agendarChip() {
+    const segundosPorTempo = 60 / Math.min(200, 140 + (nivel - 1) * 6);
+    while (proximoTempoChip < audio.currentTime + 0.2) {
+      // melodia: procura a nota que começa neste tempo
+      let t = 0;
+      for (const [nome, dur] of MELODIA) {
+        if (Math.abs(t - posicaoChip) < 0.001 && nome !== "_") {
+          nota(N[nome], dur * segundosPorTempo * 0.9, "square", 0.035, proximoTempoChip - audio.currentTime);
+        }
+        t += dur;
+      }
+      // baixo: notas de meio tempo alternando a nota e a oitava
+      const compasso = Math.floor(posicaoChip / 4);
+      const fBaixo = N[BAIXO[compasso % BAIXO.length]] / 2;
+      const oitava = Math.round(posicaoChip * 2) % 2 === 1 ? 2 : 1;
+      nota(fBaixo * oitava, segundosPorTempo * 0.45, "triangle", 0.1, proximoTempoChip - audio.currentTime);
+
+      posicaoChip = (posicaoChip + 0.5) % DURACAO_TOTAL;
+      proximoTempoChip += segundosPorTempo * 0.5;
+    }
+  }
+
+  atualizarBotoesAudio();
+  carregarYouTube();
+
+  document.getElementById("botaoMusica").addEventListener("click", e => { iniciarAudio(); alternarMusica(); e.currentTarget.blur(); });
+  document.getElementById("botaoSons").addEventListener("click", e => { iniciarAudio(); alternarSons(); e.currentTarget.blur(); });
+
+  // ===== Controles =====
+  const teclas = {
+    ArrowLeft: "esquerda",
+    ArrowRight: "direita",
+    ArrowUp: "girar",
+    ArrowDown: "descer",
+    " ": "soltar",
+    c: "guardar",
+    C: "guardar",
+    p: "pausar",
+    P: "pausar",
+    m: "musica",
+    M: "musica",
+    n: "sons",
+    N: "sons"
+  };
+
+  document.addEventListener("keydown", evento => {
+    if (evento.key === "Enter" && !jogando) return iniciar();
+    const nome = teclas[evento.key];
+    if (!nome) return;
+    evento.preventDefault(); // impede a página de rolar com as setas/espaço
+    acao(nome);
+  });
+
+  document.querySelectorAll(".controles button").forEach(botao => {
+    botao.addEventListener("click", () => acao(botao.dataset.acao));
+  });
+
+  botaoJogar.addEventListener("click", () => {
+    if (pausado) alternarPausa();
+    else iniciar();
+    botaoJogar.blur(); // evita que o Espaço "clique" no botão de novo
+  });
+</script>
+
+</body>
+</html>

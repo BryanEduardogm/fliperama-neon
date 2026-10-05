@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>2048 · Fliperama Neon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fundo: #0b0820; --painel: #151033; --borda: #2e2766; --texto: #f1eeff; --suave: #a39fd0;
+    --ciano: #00f0ff; --rosa: #ff2bd6; --amarelo: #ffe600;
+    --t: min(19vw, 88px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% 0%, #2a1460, var(--fundo) 65%);
+    color: var(--texto); font-family: "Segoe UI", Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 16px 24px;
+    user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  .topo { width: 100%; max-width: 420px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .voltar { color: var(--suave); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--borda); padding: 6px 10px; border-radius: 8px; }
+  .voltar:hover { color: var(--ciano); border-color: var(--ciano); }
+  h1 { font-family: "Press Start 2P", monospace; font-size: 1.1rem; color: var(--amarelo); text-shadow: 0 0 8px var(--amarelo); }
+  .placar { display: flex; gap: 8px; }
+  .info { background: var(--painel); border: 1px solid var(--borda); border-radius: 8px; padding: 4px 10px; font-size: 0.65rem; color: var(--suave); text-align: center; }
+  .info b { display: block; color: var(--amarelo); font-size: 1rem; }
+  main { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+  .tabuleiro {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(4, var(--t));
+    gap: 8px;
+    padding: 8px;
+    background: #06041a;
+    border: 2px solid var(--amarelo);
+    border-radius: 12px;
+    box-shadow: 0 0 18px rgba(255, 230, 0, 0.3);
+  }
+
+  .peca {
+    width: var(--t); height: var(--t);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900;
+    font-size: calc(var(--t) * 0.38);
+    background: #1a1440;
+    color: #0b0820;
+  }
+  .peca.nova { animation: surgir 0.15s ease-out; }
+  .peca.juntou { animation: pulo 0.18s ease-out; }
+  @keyframes surgir { from { transform: scale(0.3); } to { transform: scale(1); } }
+  @keyframes pulo { 50% { transform: scale(1.15); } }
+
+  .aviso { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(6, 4, 26, 0.85); border-radius: 10px; text-align: center; padding: 16px; }
+  .aviso.escondido { display: none; }
+  .aviso h2 { font-family: "Press Start 2P", monospace; font-size: 1rem; color: var(--rosa); text-shadow: 0 0 10px var(--rosa); line-height: 1.5; }
+  .aviso p { color: var(--suave); }
+  .botao { background: transparent; color: var(--amarelo); border: 2px solid var(--amarelo); border-radius: 8px; padding: 10px 20px; font-weight: 800; font-size: 0.95rem; cursor: pointer; }
+  .botao.pequeno { padding: 6px 12px; font-size: 0.8rem; }
+  .dica { font-size: 0.75rem; color: var(--suave); text-align: center; }
+</style>
+</head>
+<body>
+<header class="topo">
+  <a href="fliperama-neon.html" class="voltar">← Fliperama</a>
+  <h1>2048</h1>
+  <div class="placar">
+    <div class="info">PONTOS<b id="pontos">0</b></div>
+    <div class="info">RECORDE<b id="recorde">0</b></div>
+  </div>
+</header>
+
+<main>
+  <div class="tabuleiro" id="tabuleiro">
+    <div class="aviso escondido" id="aviso">
+      <h2 id="avisoTitulo"></h2>
+      <p id="avisoTexto"></p>
+      <button class="botao" id="botaoAviso">JOGAR DE NOVO</button>
+    </div>
+  </div>
+  <button class="botao pequeno" id="novo">↻ Novo jogo</button>
+  <p class="dica">Setas ou WASD · deslize o dedo · junte peças iguais até chegar no 2048!</p>
+</main>
+
+<script>
+  const CHAVE = "fliperama_2048";
+  const CORES = {
+    2: "#00f0ff", 4: "#39ff88", 8: "#ffe600", 16: "#ffb000", 32: "#ff6a3d", 64: "#ff2bd6",
+    128: "#b06bff", 256: "#6b7bff", 512: "#00ffd0", 1024: "#ff5a8a", 2048: "#ffffff"
+  };
+
+  const tab = document.getElementById("tabuleiro");
+  let grade, pontos, venceu, continuarDepois2048;
+  let recorde = ler();
+  document.getElementById("recorde").textContent = recorde;
+
+  function ler() { try { return Number(localStorage.getItem(CHAVE)) || 0; } catch (e) { return 0; } }
+  function salvar(v) { try { localStorage.setItem(CHAVE, v); } catch (e) {} }
+
+  let audio = null;
+  function bip(freq, dur, tipo = "triangle", vol = 0.05) {
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = tipo; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, audio.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + dur);
+      o.connect(g).connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + dur);
+    } catch (e) {}
+  }
+
+  // 16 peças fixas; só muda o número e a cor
+  const pecas = [];
+  for (let i = 0; i < 16; i++) {
+    const d = document.createElement("div");
+    d.className = "peca";
+    tab.appendChild(d);
+    pecas.push(d);
+  }
+
+  function novoJogo() {
+    grade = Array.from({ length: 4 }, () => Array(4).fill(0));
+    pontos = 0;
+    venceu = false;
+    continuarDepois2048 = false;
+    document.getElementById("aviso").classList.add("escondido");
+    const n1 = adicionarPeca(), n2 = adicionarPeca();
+    desenhar(new Set([n1, n2]), new Set());
+  }
+
+  function adicionarPeca() {
+    const vazias = [];
+    grade.forEach((linha, l) => linha.forEach((v, c) => { if (!v) vazias.push([l, c]); }));
+    if (!vazias.length) return -1;
+    const [l, c] = vazias[Math.floor(Math.random() * vazias.length)];
+    grade[l][c] = Math.random() < 0.9 ? 2 : 4;
+    return l * 4 + c;
+  }
+
+  // Desliza uma linha para a esquerda e junta iguais. Devolve a linha nova e onde juntou.
+  function deslizarLinha(linha) {
+    const numeros = linha.filter(v => v);
+    const nova = [], juntou = [];
+    for (let i = 0; i < numeros.length; i++) {
+      if (numeros[i] === numeros[i + 1]) {
+        nova.push(numeros[i] * 2);
+        pontos += numeros[i] * 2;
+        juntou.push(nova.length - 1);
+        i++;
+      } else {
+        nova.push(numeros[i]);
+      }
+    }
+    while (nova.length < 4) nova.push(0);
+    return { nova, juntou };
+  }
+
+  function mover(direcao) {
+    if (!document.getElementById("aviso").classList.contains("escondido")) return;
+    const antes = JSON.stringify(grade);
+    const juntadas = new Set();
+    for (let i = 0; i < 4; i++) {
+      // monta a linha na ordem da direção, desliza e devolve para o lugar
+      const pos = [0, 1, 2, 3].map(j => {
+        if (direcao === "esq") return [i, j];
+        if (direcao === "dir") return [i, 3 - j];
+        if (direcao === "cima") return [j, i];
+        return [3 - j, i];
+      });
+      const { nova, juntou } = deslizarLinha(pos.map(([l, c]) => grade[l][c]));
+      pos.forEach(([l, c], j) => { grade[l][c] = nova[j]; });
+      juntou.forEach(j => juntadas.add(pos[j][0] * 4 + pos[j][1]));
+    }
+    if (JSON.stringify(grade) === antes) return; // nada mexeu
+
+    const nova = adicionarPeca();
+    bip(juntadas.size ? 520 + juntadas.size * 80 : 300, 0.07);
+    if (pontos > recorde) { recorde = pontos; salvar(recorde); }
+    desenhar(new Set([nova]), juntadas);
+
+    if (!venceu && grade.flat().includes(2048)) {
+      venceu = true;
+      [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => bip(f, 0.15, "square"), i * 110));
+      mostrarAviso("VOCÊ CHEGOU NO 2048! 🏆", "Quer continuar jogando para fazer mais pontos?", "CONTINUAR");
+    } else if (semJogadas()) {
+      bip(150, 0.4, "sawtooth", 0.07);
+      mostrarAviso("FIM DE JOGO", `Você fez ${pontos} pontos.`, "JOGAR DE NOVO");
+    }
+  }
+
+  function semJogadas() {
+    for (let l = 0; l < 4; l++) for (let c = 0; c < 4; c++) {
+      const v = grade[l][c];
+      if (!v || (c < 3 && grade[l][c + 1] === v) || (l < 3 && grade[l + 1][c] === v)) return false;
+    }
+    return true;
+  }
+
+  function mostrarAviso(titulo, texto, botao) {
+    document.getElementById("avisoTitulo").textContent = titulo;
+    document.getElementById("avisoTexto").textContent = texto;
+    document.getElementById("botaoAviso").textContent = botao;
+    document.getElementById("aviso").classList.remove("escondido");
+  }
+
+  function desenhar(novas, juntadas) {
+    grade.flat().forEach((v, i) => {
+      const p = pecas[i];
+      p.textContent = v || "";
+      p.className = "peca" + (novas.has(i) ? " nova" : "") + (juntadas.has(i) ? " juntou" : "");
+      const cor = CORES[v] || "#ffffff";
+      p.style.background = v ? cor : "#1a1440";
+      p.style.boxShadow = v ? `0 0 ${Math.min(24, 6 + Math.log2(v) * 2)}px ${cor}` : "none";
+      p.style.fontSize = v >= 1024 ? "calc(var(--t) * 0.28)" : v >= 128 ? "calc(var(--t) * 0.33)" : "";
+    });
+    document.getElementById("pontos").textContent = pontos;
+    document.getElementById("recorde").textContent = recorde;
+  }
+
+  const TECLAS = { ArrowUp: "cima", KeyW: "cima", ArrowDown: "baixo", KeyS: "baixo", ArrowLeft: "esq", KeyA: "esq", ArrowRight: "dir", KeyD: "dir" };
+  document.addEventListener("keydown", e => {
+    if (TECLAS[e.code]) { e.preventDefault(); mover(TECLAS[e.code]); }
+  });
+
+  let inicio = null;
+  document.addEventListener("touchstart", e => { inicio = e.touches[0]; }, { passive: true });
+  document.addEventListener("touchend", e => {
+    if (!inicio) return;
+    const dx = e.changedTouches[0].clientX - inicio.clientX;
+    const dy = e.changedTouches[0].clientY - inicio.clientY;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) > 30) mover(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "dir" : "esq") : (dy > 0 ? "baixo" : "cima"));
+    inicio = null;
+  });
+
+  document.getElementById("botaoAviso").addEventListener("click", () => {
+    if (venceu && !continuarDepois2048 && !semJogadas()) {
+      continuarDepois2048 = true;
+      document.getElementById("aviso").classList.add("escondido");
+    } else {
+      novoJogo();
+    }
+  });
+  document.getElementById("novo").addEventListener("click", e => { novoJogo(); e.currentTarget.blur(); });
+
+  novoJogo();
+</script>
+</body>
+</html>

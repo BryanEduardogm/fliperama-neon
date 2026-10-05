@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fliperama Neon · Jogos grátis no navegador</title>
+<meta name="description" content="12 jogos grátis que rodam direto no navegador, no PC ou no celular. Sem cadastro e sem download.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Exo+2:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fundo: #0b0820;
+    --fundo2: #120c30;
+    --painel: #171039;
+    --borda: #2e2766;
+    --texto: #f1eeff;
+    --suave: #a39fd0;
+    --ciano: #00f0ff;
+    --rosa: #ff2bd6;
+    --amarelo: #ffe600;
+    --verde: #39ff88;
+    --titulo: "Press Start 2P", monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--fundo);
+    color: var(--texto);
+    font-family: "Exo 2", "Segoe UI", Arial, sans-serif;
+    font-size: 1.05rem;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  a { color: inherit; }
+  .container { width: 100%; max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+
+  /* ===== Fundo animado: grade neon em perspectiva + estrelas ===== */
+  .fundo-animado { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: radial-gradient(ellipse at 50% 0%, #2a1460 0%, var(--fundo) 60%); }
+  .fundo-animado::before {
+    content: "";
+    position: absolute;
+    left: -50%; right: -50%; bottom: -10%;
+    height: 60%;
+    background-image:
+      linear-gradient(rgba(255, 43, 214, 0.35) 2px, transparent 2px),
+      linear-gradient(90deg, rgba(255, 43, 214, 0.35) 2px, transparent 2px);
+    background-size: 60px 60px;
+    transform: perspective(400px) rotateX(65deg);
+    transform-origin: bottom;
+    animation: grade 2.5s linear infinite;
+    mask-image: linear-gradient(to top, #000 30%, transparent);
+    -webkit-mask-image: linear-gradient(to top, #000 30%, transparent);
+  }
+  @keyframes grade { to { background-position: 0 60px; } }
+  #estrelas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fundo-animado::before, .pulsar, .flutuar { animation: none !important; }
+  }
+
+  /* ===== Cabeçalho ===== */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(11, 8, 32, 0.8);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--borda);
+  }
+  .nav { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 12px; }
+  .logo { font-family: var(--titulo); font-size: 0.85rem; text-decoration: none; color: var(--ciano); text-shadow: 0 0 10px var(--ciano); white-space: nowrap; }
+  .logo span { color: var(--rosa); text-shadow: 0 0 10px var(--rosa); }
+  .menu { display: flex; gap: 20px; list-style: none; }
+  .menu a { text-decoration: none; color: var(--suave); font-weight: 600; }
+  .menu a:hover { color: var(--texto); }
+  @media (max-width: 720px) { .menu { display: none; } }
+
+  /* ===== Botões ===== */
+  .botao {
+    display: inline-block;
+    font-family: var(--titulo);
+    font-size: 0.8rem;
+    text-decoration: none;
+    color: #1a0b2e;
+    background: linear-gradient(90deg, var(--amarelo), #ffb000);
+    padding: 16px 26px;
+    border-radius: 10px;
+    box-shadow: 0 0 22px rgba(255, 230, 0, 0.45), 0 4px 0 #a36a00;
+    transition: transform 0.15s;
+    border: none;
+    cursor: pointer;
+  }
+  .botao:hover { transform: translateY(-2px) scale(1.03); }
+  .botao.pequeno { font-size: 0.6rem; padding: 10px 14px; box-shadow: 0 0 14px rgba(255, 230, 0, 0.4), 0 3px 0 #a36a00; }
+  .pulsar { animation: pulsar 1.8s ease-in-out infinite; }
+  @keyframes pulsar { 50% { box-shadow: 0 0 38px rgba(255, 230, 0, 0.8), 0 4px 0 #a36a00; } }
+  .microcopy { font-size: 0.85rem; color: var(--suave); margin-top: 12px; }
+
+  /* ===== Hero ===== */
+  .hero { padding: 64px 0 40px; text-align: center; }
+  .etiqueta { display: inline-block; font-size: 0.8rem; font-weight: 800; letter-spacing: 2px; color: var(--verde); border: 1px solid var(--verde); border-radius: 999px; padding: 4px 14px; margin-bottom: 20px; box-shadow: 0 0 12px rgba(57, 255, 136, 0.3); }
+  .hero h1 {
+    font-family: var(--titulo);
+    font-size: clamp(1.4rem, 5.2vw, 2.8rem);
+    line-height: 1.35;
+    margin-bottom: 20px;
+    text-shadow: 0 0 18px rgba(0, 240, 255, 0.6);
+  }
+  .hero h1 em { font-style: normal; color: var(--rosa); text-shadow: 0 0 18px var(--rosa); }
+  .hero .sub { max-width: 640px; margin: 0 auto 28px; color: var(--suave); font-size: 1.15rem; }
+  .numeros { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
+  .numero { background: rgba(23, 16, 57, 0.8); border: 1px solid var(--borda); border-radius: 12px; padding: 10px 18px; text-align: center; min-width: 130px; }
+  .numero b { display: block; font-family: var(--titulo); font-size: 1rem; color: var(--amarelo); margin-bottom: 4px; }
+  .numero span { font-size: 0.8rem; color: var(--suave); }
+
+  /* ===== Seções ===== */
+  section { padding: 56px 0; }
+  .titulo-secao { font-family: var(--titulo); font-size: clamp(1rem, 3.5vw, 1.5rem); line-height: 1.5; text-align: center; margin-bottom: 14px; }
+  .titulo-secao .c { color: var(--ciano); text-shadow: 0 0 12px var(--ciano); }
+  .titulo-secao .r { color: var(--rosa); text-shadow: 0 0 12px var(--rosa); }
+  .titulo-secao .a { color: var(--amarelo); text-shadow: 0 0 12px var(--amarelo); }
+  .texto-secao { max-width: 640px; margin: 0 auto 32px; text-align: center; color: var(--suave); }
+  .texto-secao p + p { margin-top: 12px; }
+
+  /* ===== Jogos ===== */
+  .filtros { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
+  .filtro { background: var(--painel); color: var(--suave); border: 1px solid var(--borda); border-radius: 999px; padding: 6px 16px; font-family: inherit; font-weight: 600; font-size: 0.9rem; cursor: pointer; }
+  .filtro.ativo { color: #1a0b2e; background: var(--ciano); border-color: var(--ciano); box-shadow: 0 0 12px rgba(0, 240, 255, 0.5); }
+
+  .grade-jogos { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
+  .jogo {
+    position: relative;
+    display: flex; flex-direction: column;
+    background: var(--painel);
+    border: 1px solid var(--borda);
+    border-radius: 16px;
+    overflow: hidden;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  }
+  .jogo:hover { transform: translateY(-6px); border-color: var(--cor); box-shadow: 0 0 26px color-mix(in srgb, var(--cor) 55%, transparent); }
+  .capa {
+    height: 140px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 4rem;
+    background:
+      radial-gradient(circle at 50% 120%, color-mix(in srgb, var(--cor) 60%, transparent), transparent 70%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0 2px, transparent 2px 6px),
+      #0e0928;
+    position: relative;
+  }
+  .capa .flutuar { display: inline-block; animation: flutuar 3s ease-in-out infinite; filter: drop-shadow(0 0 14px var(--cor)); }
+  @keyframes flutuar { 50% { transform: translateY(-8px) rotate(-4deg); } }
+  .selo { position: absolute; top: 10px; left: 10px; font-size: 0.7rem; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: rgba(11, 8, 32, 0.85); border: 1px solid var(--verde); color: var(--verde); }
+  .selo.pc { border-color: var(--rosa); color: var(--rosa); }
+  .categoria { position: absolute; top: 10px; right: 10px; font-size: 0.7rem; color: var(--suave); background: rgba(11, 8, 32, 0.85); padding: 3px 9px; border-radius: 999px; }
+  .info-jogo { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .info-jogo h3 { font-size: 1.15rem; font-weight: 800; color: var(--texto); }
+  .info-jogo p { font-size: 0.92rem; color: var(--suave); line-height: 1.45; flex: 1; }
+  .rodape-jogo { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; gap: 8px; }
+  .recorde-jogo { font-size: 0.8rem; color: var(--suave); }
+  .recorde-jogo b { color: var(--amarelo); }
+  .jogar { font-family: var(--titulo); font-size: 0.6rem; color: #1a0b2e; background: var(--cor); padding: 8px 12px; border-radius: 8px; white-space: nowrap; }
+
+  /* ===== Dor ===== */
+  .lista-dor { max-width: 560px; margin: 0 auto; list-style: none; display: grid; gap: 10px; }
+  .lista-dor li { background: rgba(23, 16, 57, 0.75); border: 1px solid var(--borda); border-left: 4px solid var(--rosa); border-radius: 10px; padding: 12px 16px; }
+
+  /* ===== Benefícios ===== */
+  .grade-beneficios { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .beneficio { background: rgba(23, 16, 57, 0.75); border: 1px solid var(--borda); border-radius: 14px; padding: 18px; }
+  .beneficio .icone { font-size: 1.8rem; margin-bottom: 6px; }
+  .beneficio h3 { font-size: 1.05rem; margin-bottom: 4px; }
+  .beneficio p { color: var(--suave); font-size: 0.92rem; }
+
+  /* ===== Prova social ===== */
+  .aviso-ilustrativo { display: block; width: fit-content; margin: -4px auto 24px; font-size: 0.75rem; color: var(--suave); border: 1px dashed var(--borda); border-radius: 999px; padding: 3px 12px; }
+  .grade-depoimentos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .depoimento { background: rgba(23, 16, 57, 0.8); border: 1px solid var(--borda); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .depoimento p { font-size: 0.98rem; }
+  .depoimento .quem { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: var(--suave); }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #1a0b2e; }
+  .estrelas-nota { color: var(--amarelo); letter-spacing: 2px; }
+
+  /* ===== Oferta ===== */
+  .oferta { max-width: 560px; margin: 0 auto; background: rgba(23, 16, 57, 0.9); border: 2px solid var(--amarelo); border-radius: 18px; padding: 24px 20px; box-shadow: 0 0 30px rgba(255, 230, 0, 0.2); }
+  .oferta ul { list-style: none; display: grid; gap: 8px; margin-bottom: 18px; }
+  .oferta li::before { content: "✓ "; color: var(--verde); font-weight: 800; }
+  .oferta .total { border-top: 1px dashed var(--borda); padding-top: 14px; display: grid; gap: 4px; font-size: 0.95rem; color: var(--suave); }
+  .oferta .total b { color: var(--texto); }
+  .oferta .preco { font-family: var(--titulo); font-size: 1.4rem; color: var(--amarelo); text-shadow: 0 0 14px var(--amarelo); margin: 10px 0 4px; }
+
+  /* ===== Objeções / FAQ ===== */
+  .grade-objecoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+  .objecao { background: rgba(23, 16, 57, 0.75); border: 1px solid var(--borda); border-radius: 14px; padding: 18px; }
+  .objecao h3 { font-size: 1rem; color: var(--ciano); margin-bottom: 6px; }
+  .objecao p { color: var(--suave); font-size: 0.95rem; }
+
+  .faq { max-width: 720px; margin: 0 auto; display: grid; gap: 10px; }
+  .faq details { background: rgba(23, 16, 57, 0.8); border: 1px solid var(--borda); border-radius: 12px; padding: 14px 18px; }
+  .faq summary { cursor: pointer; font-weight: 800; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+  .faq summary::after { content: "+"; color: var(--rosa); font-size: 1.3rem; line-height: 1; }
+  .faq details[open] summary::after { content: "−"; }
+  .faq details p { color: var(--suave); margin-top: 8px; }
+
+  /* ===== Garantia / recordes ===== */
+  .garantia { max-width: 640px; margin: 0 auto; text-align: center; background: rgba(23, 16, 57, 0.8); border: 1px solid var(--verde); border-radius: 18px; padding: 26px 20px; box-shadow: 0 0 24px rgba(57, 255, 136, 0.15); }
+  .garantia .escudo { font-size: 2.6rem; }
+  .garantia h2 { font-family: var(--titulo); font-size: 0.95rem; line-height: 1.6; color: var(--verde); margin: 8px 0 10px; }
+  .garantia p { color: var(--suave); }
+
+  .grade-recordes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; max-width: 880px; margin: 0 auto; }
+  .recorde { background: rgba(23, 16, 57, 0.8); border: 1px solid var(--borda); border-radius: 12px; padding: 12px; text-align: center; }
+  .recorde .nome { font-size: 0.8rem; color: var(--suave); }
+  .recorde b { display: block; font-family: var(--titulo); font-size: 0.85rem; color: var(--amarelo); margin-top: 6px; }
+  .recorde.vazio b { color: var(--borda); }
+
+  /* ===== CTA final / PS / rodapé ===== */
+  .cta-final { text-align: center; }
+  .cta-final h2 { font-family: var(--titulo); font-size: clamp(1.1rem, 4vw, 1.8rem); line-height: 1.5; margin-bottom: 14px; }
+  .cta-final p { color: var(--suave); margin-bottom: 24px; }
+  .ps { max-width: 640px; margin: 0 auto; background: rgba(255, 230, 0, 0.06); border: 1px dashed var(--amarelo); border-radius: 12px; padding: 16px 18px; }
+  .ps b { color: var(--amarelo); }
+  footer { border-top: 1px solid var(--borda); padding: 24px 0 32px; text-align: center; color: var(--suave); font-size: 0.85rem; }
+  footer p + p { margin-top: 6px; }
+
+  /* Aparece ao rolar */
+  .revelar { opacity: 0; transform: translateY(24px); transition: opacity 0.6s, transform 0.6s; }
+  .revelar.visivel { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+
+<div class="fundo-animado"><canvas id="estrelas"></canvas></div>
+
+<header>
+  <div class="container nav">
+    <a href="#topo" class="logo">FLIPERAMA <span>NEON</span></a>
+    <ul class="menu">
+      <li><a href="#jogos">Jogos</a></li>
+      <li><a href="#recordes">Recordes</a></li>
+      <li><a href="#duvidas">Dúvidas</a></li>
+    </ul>
+    <a href="#jogos" class="botao pequeno">JOGAR AGORA</a>
+  </div>
+</header>
+
+<main id="topo">
+
+  <!-- 1 a 4: headline, subheadline, abertura, CTA -->
+  <section class="hero">
+    <div class="container">
+      <div class="etiqueta">● 12 JOGOS ONLINE · GRÁTIS</div>
+      <h1>12 jogos grátis.<br><em>Até no PC da escola.</em></h1>
+      <p class="sub">Tem até <b>tiro em primeira pessoa</b> rodando direto no navegador. Tetris, jogo de ritmo, 2048 e mais, no PC ou no celular, sem cadastro e sem instalar nada.</p>
+      <a href="#jogos" class="botao pulsar">JOGAR AGORA</a>
+      <p class="microcopy">Grátis • Sem cadastro • Sem download</p>
+      <div class="numeros">
+        <div class="numero"><b>12</b><span>jogos</span></div>
+        <div class="numero"><b>1 clique</b><span>para começar</span></div>
+        <div class="numero"><b>R$ 0</b><span>para sempre</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Grade de jogos (logo na primeira rolagem) -->
+  <section id="jogos">
+    <div class="container">
+      <h2 class="titulo-secao"><span class="c">ESCOLHA</span> SEU JOGO</h2>
+      <p class="texto-secao">Clique e já está jogando. Seu recorde fica salvo no navegador.</p>
+      <div class="filtros" id="filtros">
+        <button class="filtro ativo" data-filtro="todos">Todos</button>
+        <button class="filtro" data-filtro="acao">Ação</button>
+        <button class="filtro" data-filtro="classico">Clássicos</button>
+        <button class="filtro" data-filtro="puzzle">Raciocínio</button>
+        <button class="filtro" data-filtro="celular">📱 Funciona no celular</button>
+      </div>
+      <div class="grade-jogos" id="gradeJogos"></div>
+    </div>
+  </section>
+
+  <!-- 3: abertura / proposta de valor -->
+  <section class="revelar">
+    <div class="container texto-secao">
+      <p><b>Intervalo da aula. Fila do médico. Aquele domingo que não acaba.</b></p>
+      <p>Você abre a loja de apps e o jogo pesa 2 GB. Pede cadastro. Pede permissão. Trava no seu celular.</p>
+      <p>Aqui é diferente: <b>você escolhe o jogo e já está jogando.</b> Sem baixar, sem conta, sem esperar.</p>
+    </div>
+  </section>
+
+  <!-- 5: dor -->
+  <section class="revelar">
+    <div class="container">
+      <h2 class="titulo-secao">SÓ QUERIA <span class="r">10 MINUTOS</span> DE DIVERSÃO…</h2>
+      <p class="texto-secao">…e perdeu 10 minutos tentando começar. Já passou por isso?</p>
+      <ul class="lista-dor">
+        <li>📦 Jogo que pede <b>2 GB</b> e seu celular já está sem espaço</li>
+        <li>📝 Cadastro, e-mail, senha… só para jogar uma partida</li>
+        <li>⏳ Aquele "carregando…" que nunca termina</li>
+        <li>🐢 PC da escola que trava em tudo que é jogo</li>
+        <li>📱 Ficar rolando o feed sem nada para fazer</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 6: solução -->
+  <section class="revelar">
+    <div class="container texto-secao">
+      <h2 class="titulo-secao">O <span class="c">FLIPERAMA NEON</span> RESOLVE</h2>
+      <p>Cada jogo é <b>um único arquivo leve</b>, menor que uma foto do seu celular. Abre na hora, sem instalação e sem servidor pesado.</p>
+      <p>Por isso roda no PC da escola, no notebook antigo e no celular. Você só precisa de um navegador.</p>
+    </div>
+  </section>
+
+  <!-- 7: benefícios -->
+  <section class="revelar">
+    <div class="container">
+      <h2 class="titulo-secao">POR QUE JOGAR <span class="a">AQUI</span></h2>
+      <div class="grade-beneficios">
+        <div class="beneficio"><div class="icone">⚡</div><h3>Você joga em segundos</h3><p>Não em minutos. Clicou, abriu, jogou.</p></div>
+        <div class="beneficio"><div class="icone">📱</div><h3>Joga onde estiver</h3><p>8 dos 12 jogos funcionam no celular com controle de toque.</p></div>
+        <div class="beneficio"><div class="icone">🔒</div><h3>Ninguém pede seus dados</h3><p>Sem cadastro, sem e-mail, sem senha.</p></div>
+        <div class="beneficio"><div class="icone">💾</div><h3>Seu celular não enche</h3><p>Nada é instalado. Fechou a aba, acabou.</p></div>
+        <div class="beneficio"><div class="icone">🏆</div><h3>Seu recorde fica salvo</h3><p>Volte depois e tente bater a sua própria marca.</p></div>
+        <div class="beneficio"><div class="icone">🔥</div><h3>Jogo para todo humor</h3><p>Tiro, corrida, ritmo, terror, construção, reflexo, raciocínio e clássicos.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8: prova social (ilustrativa) -->
+  <section class="revelar">
+    <div class="container">
+      <h2 class="titulo-secao">QUEM JOGA, <span class="r">VOLTA</span></h2>
+      <span class="aviso-ilustrativo">Números e depoimentos ilustrativos</span>
+      <div class="numeros" style="margin: 0 0 24px">
+        <div class="numero"><b>+12.400</b><span>partidas jogadas</span></div>
+        <div class="numero"><b>4,8 ★</b><span>nota dos jogadores</span></div>
+      </div>
+      <div class="grade-depoimentos">
+        <div class="depoimento">
+          <div class="estrelas-nota">★★★★★</div>
+          <p>"Joguei Zona de Combate no intervalo e quase perdi a hora de voltar pra aula. Roda liso no PC da escola!"</p>
+          <div class="quem"><div class="avatar" style="background: var(--ciano)">L</div>Lucas, 14 anos</div>
+        </div>
+        <div class="depoimento">
+          <div class="estrelas-nota">★★★★★</div>
+          <p>"Bati 18 mil pontos no Tetris Neon. Meu irmão tá tentando passar até agora."</p>
+          <div class="quem"><div class="avatar" style="background: var(--rosa)">A</div>Ana, 12 anos</div>
+        </div>
+        <div class="depoimento">
+          <div class="estrelas-nota">★★★★★</div>
+          <p>"Jogo 2048 no ônibus indo pra escola. Abre na hora no celular, sem baixar nada."</p>
+          <div class="quem"><div class="avatar" style="background: var(--amarelo)">M</div>Marcos, 16 anos</div>
+        </div>
+        <div class="depoimento">
+          <div class="estrelas-nota">★★★★☆</div>
+          <p>"Meu notebook é bem fraco e mesmo assim todos os jogos rodaram. O Pássaro Voador é viciante!"</p>
+          <div class="quem"><div class="avatar" style="background: var(--verde)">J</div>Júlia, 15 anos</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9: oferta -->
+  <section class="revelar">
+    <div class="container">
+      <h2 class="titulo-secao">TUDO ISSO, <span class="a">DE GRAÇA</span></h2>
+      <div class="oferta">
+        <ul id="listaOferta"></ul>
+        <div class="total">
+          <div>Cadastro: <b>nenhum</b></div>
+          <div>Download: <b>nenhum</b></div>
+          <div>Espaço no celular: <b>zero</b></div>
+          <div class="preco">R$ 0,00</div>
+          <div>Jogos de loja costumam custar dinheiro, espaço e paciência. Aqui, o único custo é o seu tempo livre.</div>
+        </div>
+        <div style="text-align:center; margin-top: 20px">
+          <a href="#jogos" class="botao">ESCOLHER MEU JOGO</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10: objeções -->
+  <section class="revelar">
+    <div class="container">
+      <h2 class="titulo-secao">"MAS SERÁ QUE…"</h2>
+      <p class="texto-secao">As dúvidas que todo mundo tem antes de clicar.</p>
+      <div class="grade-objecoes">
+        <div class="objecao"><h3>…roda no meu PC?</h3><p>Os jogos foram feitos para serem leves, pensando em computador sem placa de vídeo. Foram feitos para rodar em PCs simples.</p></div>
+        <div class="objecao"><h3>…é seguro? Vai baixar vírus?</h3><p>Você não baixa nada. Tudo roda dentro do navegador, como qualquer site. Nenhum arquivo é instalado.</p></div>
+        <div class="objecao"><h3>…se é grátis, qual é a pegadinha?</h3><p>Não tem. Não pede cartão, não pede cadastro, não vende assinatura. Entrou, jogou.</p></div>
+        <div class="objecao"><h3>…funciona no celular?</h3><p>Sim: 8 dos 12 jogos têm controle de toque. Zona de Combate, Mundo de Blocos, Turbo Neon e Neon Morto são só para PC, porque precisam de mouse e teclado.</p></div>
+        <div class="objecao"><h3>…é para a minha idade?</h3><p>Os jogos são para quem tem mais de 10 anos. A Zona de Combate tem tiro contra bots, com visual de blocos e sem violência realista. O Neon Morto é de suspense, com sustos, mas sem sangue.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11: garantia -->
+  <section class="revelar">
+    <div class="container">
+      <div class="garantia">
+        <div class="escudo">🛡️</div>
+        <h2>ZERO RISCO, ZERO COMPROMISSO</h2>
+        <p>Não gostou de um jogo? Fecha a aba e pronto.<br>Você não deixa e-mail, não cria conta e não paga nada.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12: desafio (no lugar de escassez falsa): seus recordes reais -->
+  <section id="recordes" class="revelar">
+    <div class="container">
+      <h2 class="titulo-secao">🏆 SEU <span class="a">DESAFIO</span></h2>
+      <p class="texto-secao">Estes são os <b>seus</b> recordes, salvos neste navegador. Consegue bater todos hoje?</p>
+      <div class="grade-recordes" id="gradeRecordes"></div>
+    </div>
+  </section>
+
+  <!-- 13: FAQ -->
+  <section id="duvidas" class="revelar">
+    <div class="container">
+      <h2 class="titulo-secao">PERGUNTAS <span class="c">FREQUENTES</span></h2>
+      <div class="faq">
+        <details><summary>Preciso criar conta?</summary><p>Não. Entrou, escolheu, jogou.</p></details>
+        <details><summary>Quanto custa?</summary><p>Nada. Todos os jogos são 100% grátis.</p></details>
+        <details><summary>Funciona no celular?</summary><p>Sim, 8 jogos têm controle de toque. Zona de Combate, Mundo de Blocos, Turbo Neon e Neon Morto são só para PC.</p></details>
+        <details><summary>Meu recorde fica salvo?</summary><p>Sim, no seu navegador. Se você limpar os dados do navegador, ele zera.</p></details>
+        <details><summary>Preciso de internet?</summary><p>Para abrir o site, sim. Alguns jogos carregam recursos da internet (como a música do Tetris e os gráficos 3D).</p></details>
+        <details><summary>Quanto tempo leva uma partida?</summary><p>De 1 a 10 minutos. Perfeito para o intervalo, a fila ou o ônibus.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- 14: CTA final -->
+  <section class="cta-final revelar">
+    <div class="container">
+      <h2>CHEGA DE <span style="color: var(--rosa)">"CARREGANDO…"</span></h2>
+      <p>Chega de cadastro para jogar uma partida.<br><b>12 jogos esperando por você, a um clique de distância.</b></p>
+      <a href="#jogos" class="botao pulsar">JOGAR AGORA</a>
+      <p class="microcopy">Grátis • Sem cadastro • Sem download</p>
+    </div>
+  </section>
+
+  <!-- 15: PS -->
+  <section class="revelar" style="padding-top: 0">
+    <div class="container">
+      <div class="ps">
+        <b>PS:</b> Lembra daquele tempo livre que você ia passar rolando o feed? Troca por uma partida de Tetris Neon. Seu recorde fica salvo, e ele está esperando você bater. 🏆
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="container">
+    <p><b>Fliperama Neon</b> · jogos grátis no navegador</p>
+    <p>Privacidade: este site não coleta dados. Os recordes ficam salvos só no seu navegador.</p>
+  </div>
+</footer>
+
+<script>
+  // ===== Lista de jogos (para adicionar um jogo novo, basta incluir aqui) =====
+  const JOGOS = [
+    { nome: "Zona de Combate", arquivo: "zona-de-combate.html", icone: "🎯", cor: "#ff5a3d", categoria: "acao", rotulo: "Tiro 3D",
+      celular: false, descricao: "Tiro em primeira pessoa contra bots: 6 mapas, 24 armas e granadas.",
+      recorde: { chave: "zonaRecordeRodada", texto: v => `Rodada ${v}` } },
+    { nome: "Turbo Neon", arquivo: "turbo-neon.html", icone: "🏎️", cor: "#ff7a3d", categoria: "acao", rotulo: "Corrida 3D",
+      celular: false, descricao: "Corrida retrô synthwave contra 3 pilotos, com nitro e drift. 4 pistas.",
+      recorde: { chave: "fliperama_turbo_sunset", texto: v => `volta ${(v / 1000).toFixed(2)}s` } },
+    { nome: "Batida Neon", arquivo: "batida-neon.html", icone: "🎵", cor: "#b06bff", categoria: "acao", rotulo: "Ritmo",
+      celular: true, descricao: "Aperte no ritmo de músicas synthwave. 3 músicas, 3 dificuldades.",
+      recorde: { chave: "fliperama_batida", texto: v => `${v} pts` } },
+    { nome: "Neon Morto", arquivo: "neon-morto.html", icone: "👁️", cor: "#ff2a4a", categoria: "acao", rotulo: "Terror",
+      celular: false, descricao: "Preso num fliperama abandonado à noite, em 4 mapas. Ache 5 fusíveis… e não tire os olhos do Pixel.",
+      recorde: { chave: "fliperama_neonmorto", texto: v => `fuga em ${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}` } },
+    { nome: "Mundo de Blocos", arquivo: "minecraft.html", icone: "🧱", cor: "#39ff88", categoria: "acao", rotulo: "Construção 3D",
+      celular: false, descricao: "Construa e destrua blocos coloridos num mundo 3D.",
+      recorde: null },
+    { nome: "Tetris Neon", arquivo: "tetris-neon.html", icone: "🟦", cor: "#00f0ff", categoria: "classico", rotulo: "Clássico",
+      celular: true, descricao: "Encaixe as peças, complete linhas e suba de nível. Com música.",
+      recorde: { chave: "tetrisNeonRecorde", texto: v => `${v} pts` } },
+    { nome: "Cobrinha", arquivo: "cobrinha.html", icone: "🐍", cor: "#39ff88", categoria: "classico", rotulo: "Clássico",
+      celular: true, descricao: "Coma as frutas, cresça e não bata em nada. Fica cada vez mais rápida!",
+      recorde: { chave: "fliperama_cobrinha", texto: v => `${v} pts` } },
+    { nome: "Pong", arquivo: "pong.html", icone: "🏓", cor: "#00f0ff", categoria: "classico", rotulo: "Clássico",
+      celular: true, descricao: "O primeiro videogame da história. Vença o computador em 3 dificuldades.",
+      recorde: { chave: "fliperama_pong", texto: v => `${v} vitória${v == 1 ? "" : "s"}` } },
+    { nome: "Pássaro Voador", arquivo: "passaro-voador.html", icone: "🐤", cor: "#ffe600", categoria: "acao", rotulo: "Reflexo",
+      celular: true, descricao: "Um toque para voar. Passe entre os canos sem bater.",
+      recorde: { chave: "fliperama_passaro", texto: v => `${v} canos` } },
+    { nome: "Campo Minado", arquivo: "campo-minado.html", icone: "💣", cor: "#ff2bd6", categoria: "puzzle", rotulo: "Raciocínio",
+      celular: true, descricao: "Use a lógica para abrir o campo sem pisar nas minas. 3 níveis.",
+      recorde: { chave: "fliperama_campo_facil", texto: v => `${v}s (fácil)` } },
+    { nome: "2048", arquivo: "2048.html", icone: "🔢", cor: "#ffb000", categoria: "puzzle", rotulo: "Raciocínio",
+      celular: true, descricao: "Deslize e junte números iguais até chegar no 2048.",
+      recorde: { chave: "fliperama_2048", texto: v => `${v} pts` } },
+    { nome: "Invasores Espaciais", arquivo: "invasores.html", icone: "👾", cor: "#b06bff", categoria: "acao", rotulo: "Arcade",
+      celular: true, descricao: "Defenda a Terra das naves invasoras. Cada onda vem mais rápida.",
+      recorde: { chave: "fliperama_invasores", texto: v => `${v} pts` } }
+  ];
+
+  function lerRecorde(chave) {
+    try { return Number(localStorage.getItem(chave)) || 0; } catch (e) { return 0; }
+  }
+
+  // Cartões dos jogos
+  const grade = document.getElementById("gradeJogos");
+  grade.innerHTML = JOGOS.map(j => {
+    const valor = j.recorde ? lerRecorde(j.recorde.chave) : 0;
+    const recorde = j.recorde
+      ? (valor ? `Recorde: <b>${j.recorde.texto(valor)}</b>` : "Sem recorde ainda")
+      : "Modo livre";
+    return `
+      <a class="jogo" href="${j.arquivo}" style="--cor:${j.cor}" data-categoria="${j.categoria}" data-celular="${j.celular}">
+        <div class="capa">
+          <span class="selo ${j.celular ? "" : "pc"}">${j.celular ? "PC + Celular" : "Só PC"}</span>
+          <span class="categoria">${j.rotulo}</span>
+          <span class="flutuar">${j.icone}</span>
+        </div>
+        <div class="info-jogo">
+          <h3>${j.nome}</h3>
+          <p>${j.descricao}</p>
+          <div class="rodape-jogo">
+            <span class="recorde-jogo">${recorde}</span>
+            <span class="jogar">JOGAR ▶</span>
+          </div>
+        </div>
+      </a>`;
+  }).join("");
+
+  // Filtros
+  document.querySelectorAll(".filtro").forEach(botao => botao.addEventListener("click", () => {
+    document.querySelectorAll(".filtro").forEach(b => b.classList.remove("ativo"));
+    botao.classList.add("ativo");
+    const f = botao.dataset.filtro;
+    grade.querySelectorAll(".jogo").forEach(card => {
+      const mostra = f === "todos" || (f === "celular" ? card.dataset.celular === "true" : card.dataset.categoria === f);
+      card.style.display = mostra ? "" : "none";
+    });
+  }));
+
+  // Lista da oferta
+  document.getElementById("listaOferta").innerHTML = JOGOS.map(j =>
+    `<li><b>${j.nome}</b>: ${j.descricao}${j.celular ? "" : " <i>(só PC)</i>"}</li>`).join("");
+
+  // Painel de recordes do jogador
+  document.getElementById("gradeRecordes").innerHTML = JOGOS.filter(j => j.recorde).map(j => {
+    const v = lerRecorde(j.recorde.chave);
+    return `<div class="recorde ${v ? "" : "vazio"}"><div class="nome">${j.icone} ${j.nome}</div><b>${v ? j.recorde.texto(v) : "—"}</b></div>`;
+  }).join("");
+
+  // Seções aparecem ao rolar
+  const observador = new IntersectionObserver(entradas => entradas.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add("visivel"); observador.unobserve(e.target); }
+  }), { threshold: 0.12 });
+  document.querySelectorAll(".revelar").forEach(el => observador.observe(el));
+
+  // Estrelas piscando no fundo (leve)
+  const canvas = document.getElementById("estrelas");
+  const ctx = canvas.getContext("2d");
+  let estrelas = [];
+  function redimensionar() {
+    canvas.width = innerWidth;
+    canvas.height = innerHeight;
+    estrelas = Array.from({ length: Math.min(120, Math.floor(innerWidth / 10)) }, () => ({
+      x: Math.random() * canvas.width, y: Math.random() * canvas.height * 0.7,
+      r: Math.random() * 1.4 + 0.3, fase: Math.random() * Math.PI * 2
+    }));
+  }
+  function animar(t) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    estrelas.forEach(s => {
+      ctx.globalAlpha = 0.35 + Math.sin(t / 700 + s.fase) * 0.3;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(s.x, s.y, s.r, s.r);
+    });
+    ctx.globalAlpha = 1;
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) requestAnimationFrame(animar);
+  }
+  addEventListener("resize", redimensionar);
+  redimensionar();
+  requestAnimationFrame(animar);
+</script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Cobrinha · Fliperama Neon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fundo: #0b0820; --painel: #151033; --borda: #2e2766; --texto: #f1eeff; --suave: #a39fd0;
+    --ciano: #00f0ff; --rosa: #ff2bd6; --amarelo: #ffe600; --verde: #39ff88;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% 0%, #2a1460, var(--fundo) 65%);
+    color: var(--texto);
+    font-family: "Segoe UI", Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 16px 24px;
+    user-select: none; -webkit-user-select: none; touch-action: manipulation;
+  }
+  .topo { width: 100%; max-width: 520px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .voltar { color: var(--suave); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--borda); padding: 6px 10px; border-radius: 8px; }
+  .voltar:hover { color: var(--ciano); border-color: var(--ciano); }
+  h1 { font-family: "Press Start 2P", monospace; font-size: 1rem; color: var(--verde); text-shadow: 0 0 8px var(--verde); }
+  .placar { display: flex; gap: 12px; font-size: 0.75rem; color: var(--suave); }
+  .placar b { color: var(--amarelo); font-size: 1rem; }
+  main { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; }
+  .area { position: relative; border: 2px solid var(--verde); border-radius: 10px; box-shadow: 0 0 18px rgba(57, 255, 136, 0.4); background: #06041a; line-height: 0; }
+  canvas { display: block; width: min(92vw, 400px); height: auto; border-radius: 8px; }
+  .aviso { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(6, 4, 26, 0.85); text-align: center; padding: 16px; line-height: 1.4; border-radius: 8px; }
+  .aviso.escondido { display: none; }
+  .aviso h2 { font-family: "Press Start 2P", monospace; font-size: 1rem; color: var(--rosa); text-shadow: 0 0 10px var(--rosa); }
+  .aviso p { color: var(--suave); font-size: 0.9rem; }
+  .botao { background: transparent; color: var(--verde); border: 2px solid var(--verde); border-radius: 8px; padding: 10px 22px; font-weight: 800; font-size: 1rem; cursor: pointer; box-shadow: 0 0 10px rgba(57, 255, 136, 0.4); }
+  .botao:hover { background: rgba(57, 255, 136, 0.12); }
+  .dpad { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 56px); gap: 8px; }
+  .dpad button { background: var(--painel); color: var(--verde); border: 1px solid var(--borda); border-radius: 10px; font-size: 1.4rem; }
+  .dpad button:active { background: rgba(57, 255, 136, 0.25); }
+  .dpad .cima { grid-column: 2; }
+  .dpad .esq { grid-column: 1; grid-row: 2; }
+  .dpad .baixo { grid-column: 2; grid-row: 2; }
+  .dpad .dir { grid-column: 3; grid-row: 2; }
+  .dica { font-size: 0.75rem; color: var(--suave); text-align: center; }
+</style>
+</head>
+<body>
+<header class="topo">
+  <a href="fliperama-neon.html" class="voltar">← Fliperama</a>
+  <h1>COBRINHA</h1>
+  <div class="placar"><span>PONTOS <b id="pontos">0</b></span><span>RECORDE <b id="recorde">0</b></span></div>
+</header>
+
+<main>
+  <div class="area">
+    <canvas id="tela" width="400" height="400"></canvas>
+    <div class="aviso" id="aviso">
+      <h2 id="avisoTitulo">COBRINHA</h2>
+      <p id="avisoTexto">Coma as frutas, cresça e não bata em nada!</p>
+      <button class="botao" id="botaoJogar">JOGAR</button>
+    </div>
+  </div>
+  <div class="dpad">
+    <button class="cima" data-dir="cima">▲</button>
+    <button class="esq" data-dir="esq">◀</button>
+    <button class="baixo" data-dir="baixo">▼</button>
+    <button class="dir" data-dir="dir">▶</button>
+  </div>
+  <p class="dica">Setas ou WASD · deslize o dedo na tela · P pausa</p>
+</main>
+
+<script>
+  const tela = document.getElementById("tela");
+  const ctx = tela.getContext("2d");
+  const N = 20;               // quadradinhos por lado
+  const T = tela.width / N;   // tamanho de cada quadradinho
+  const CHAVE = "fliperama_cobrinha";
+
+  let cobra, dir, proximaDir, fruta, pontos, velocidade, timer, rodando = false, pausado = false;
+  let recorde = ler();
+  document.getElementById("recorde").textContent = recorde;
+
+  function ler() { try { return Number(localStorage.getItem(CHAVE)) || 0; } catch (e) { return 0; } }
+  function salvar(v) { try { localStorage.setItem(CHAVE, v); } catch (e) {} }
+
+  // Sons curtos gerados pelo navegador
+  let audio = null;
+  function bip(freq, dur, tipo = "square", vol = 0.06) {
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = tipo; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, audio.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + dur);
+      o.connect(g).connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + dur);
+    } catch (e) {}
+  }
+
+  function iniciar() {
+    cobra = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+    dir = { x: 1, y: 0 };
+    proximaDir = dir;
+    pontos = 0;
+    velocidade = 140;
+    novaFruta();
+    rodando = true;
+    pausado = false;
+    document.getElementById("pontos").textContent = 0;
+    document.getElementById("aviso").classList.add("escondido");
+    clearTimeout(timer);
+    passo();
+  }
+
+  function novaFruta() {
+    do { fruta = { x: Math.floor(Math.random() * N), y: Math.floor(Math.random() * N) }; }
+    while (cobra.some(p => p.x === fruta.x && p.y === fruta.y));
+  }
+
+  function passo() {
+    if (!rodando) return;
+    if (!pausado) {
+      dir = proximaDir;
+      const cabeca = { x: cobra[0].x + dir.x, y: cobra[0].y + dir.y };
+      const bateu = cabeca.x < 0 || cabeca.y < 0 || cabeca.x >= N || cabeca.y >= N ||
+        cobra.some(p => p.x === cabeca.x && p.y === cabeca.y);
+      if (bateu) return fim();
+      cobra.unshift(cabeca);
+      if (cabeca.x === fruta.x && cabeca.y === fruta.y) {
+        pontos += 10;
+        velocidade = Math.max(60, velocidade - 3); // fica mais rápida
+        document.getElementById("pontos").textContent = pontos;
+        bip(880, 0.08); bip(1320, 0.08);
+        novaFruta();
+      } else {
+        cobra.pop();
+      }
+      desenhar();
+    }
+    timer = setTimeout(passo, velocidade);
+  }
+
+  function fim() {
+    rodando = false;
+    bip(200, 0.4, "sawtooth", 0.08);
+    let texto = `Você fez ${pontos} pontos.`;
+    if (pontos > recorde) {
+      recorde = pontos;
+      salvar(recorde);
+      document.getElementById("recorde").textContent = recorde;
+      texto = `NOVO RECORDE: ${pontos} pontos! 🏆`;
+    }
+    document.getElementById("avisoTitulo").textContent = "FIM DE JOGO";
+    document.getElementById("avisoTexto").textContent = texto;
+    document.getElementById("botaoJogar").textContent = "JOGAR DE NOVO";
+    document.getElementById("aviso").classList.remove("escondido");
+  }
+
+  function desenhar() {
+    ctx.fillStyle = "#06041a";
+    ctx.fillRect(0, 0, tela.width, tela.height);
+    ctx.strokeStyle = "rgba(57,255,136,0.05)";
+    for (let i = 1; i < N; i++) {
+      ctx.beginPath(); ctx.moveTo(i * T, 0); ctx.lineTo(i * T, tela.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * T); ctx.lineTo(tela.width, i * T); ctx.stroke();
+    }
+    // fruta
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = "#ff2bd6";
+    ctx.fillStyle = "#ff2bd6";
+    ctx.beginPath();
+    ctx.arc(fruta.x * T + T / 2, fruta.y * T + T / 2, T / 2 - 3, 0, Math.PI * 2);
+    ctx.fill();
+    // cobra
+    ctx.shadowColor = "#39ff88";
+    cobra.forEach((p, i) => {
+      ctx.fillStyle = i === 0 ? "#b6ffd4" : `hsl(${145 - i * 1.5}, 100%, ${60 - Math.min(i, 20)}%)`;
+      ctx.fillRect(p.x * T + 1, p.y * T + 1, T - 2, T - 2);
+    });
+    ctx.shadowBlur = 0;
+    // olhos
+    const c = cobra[0];
+    ctx.fillStyle = "#06041a";
+    const ox = dir.y !== 0 ? [5, 13] : [dir.x > 0 ? 13 : 5, dir.x > 0 ? 13 : 5];
+    const oy = dir.x !== 0 ? [5, 13] : [dir.y > 0 ? 13 : 5, dir.y > 0 ? 13 : 5];
+    ctx.fillRect(c.x * T + ox[0] - 1, c.y * T + oy[0] - 1, 3, 3);
+    ctx.fillRect(c.x * T + ox[1] - 1, c.y * T + oy[1] - 1, 3, 3);
+  }
+
+  const DIRECOES = { cima: { x: 0, y: -1 }, baixo: { x: 0, y: 1 }, esq: { x: -1, y: 0 }, dir: { x: 1, y: 0 } };
+  function virar(nome) {
+    const d = DIRECOES[nome];
+    if (!rodando || (d.x === -dir.x && d.y === -dir.y)) return; // não pode voltar para trás
+    proximaDir = d;
+  }
+
+  const TECLAS = { ArrowUp: "cima", KeyW: "cima", ArrowDown: "baixo", KeyS: "baixo", ArrowLeft: "esq", KeyA: "esq", ArrowRight: "dir", KeyD: "dir" };
+  document.addEventListener("keydown", e => {
+    if (TECLAS[e.code]) { e.preventDefault(); virar(TECLAS[e.code]); }
+    if (e.code === "KeyP" && rodando) {
+      pausado = !pausado;
+      document.getElementById("avisoTitulo").textContent = "PAUSADO";
+      document.getElementById("avisoTexto").textContent = "Aperte P para continuar";
+      document.getElementById("aviso").classList.toggle("escondido", !pausado);
+      document.getElementById("botaoJogar").style.display = pausado ? "none" : "";
+    }
+    if ((e.code === "Enter" || e.code === "Space") && !rodando) { e.preventDefault(); iniciar(); }
+  });
+
+  document.querySelectorAll(".dpad button").forEach(b => b.addEventListener("pointerdown", e => { e.preventDefault(); virar(b.dataset.dir); }));
+
+  // Deslizar o dedo
+  let toqueInicio = null;
+  tela.addEventListener("touchstart", e => { toqueInicio = e.touches[0]; }, { passive: true });
+  tela.addEventListener("touchend", e => {
+    if (!toqueInicio) return;
+    const dx = e.changedTouches[0].clientX - toqueInicio.clientX;
+    const dy = e.changedTouches[0].clientY - toqueInicio.clientY;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) > 20) virar(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "dir" : "esq") : (dy > 0 ? "baixo" : "cima"));
+    toqueInicio = null;
+  });
+
+  document.getElementById("botaoJogar").addEventListener("click", e => { iniciar(); e.currentTarget.blur(); });
+
+  // tela inicial
+  cobra = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+  dir = { x: 1, y: 0 };
+  fruta = { x: 15, y: 10 };
+  desenhar();
+</script>
+</body>
+</html>

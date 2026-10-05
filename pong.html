@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Pong · Fliperama Neon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fundo: #0b0820; --painel: #151033; --borda: #2e2766; --texto: #f1eeff; --suave: #a39fd0;
+    --ciano: #00f0ff; --rosa: #ff2bd6; --amarelo: #ffe600;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% 0%, #2a1460, var(--fundo) 65%);
+    color: var(--texto); font-family: "Segoe UI", Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 16px 24px;
+    user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  .topo { width: 100%; max-width: 640px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .voltar { color: var(--suave); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--borda); padding: 6px 10px; border-radius: 8px; }
+  .voltar:hover { color: var(--ciano); border-color: var(--ciano); }
+  h1 { font-family: "Press Start 2P", monospace; font-size: 1rem; color: var(--ciano); text-shadow: 0 0 8px var(--ciano); }
+  .placar { display: flex; gap: 12px; font-size: 0.75rem; color: var(--suave); }
+  .placar b { color: var(--amarelo); font-size: 1rem; }
+  main { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; }
+  .area { position: relative; border: 2px solid var(--ciano); border-radius: 10px; box-shadow: 0 0 18px rgba(0, 240, 255, 0.45); background: #06041a; line-height: 0; }
+  canvas { display: block; width: min(92vw, 600px); height: auto; border-radius: 8px; }
+  .aviso { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(6, 4, 26, 0.85); text-align: center; padding: 16px; line-height: 1.4; border-radius: 8px; }
+  .aviso.escondido { display: none; }
+  .aviso h2 { font-family: "Press Start 2P", monospace; font-size: 1rem; color: var(--rosa); text-shadow: 0 0 10px var(--rosa); }
+  .aviso p { color: var(--suave); font-size: 0.9rem; }
+  .niveis { display: flex; gap: 8px; }
+  .botao { background: transparent; color: var(--ciano); border: 2px solid var(--ciano); border-radius: 8px; padding: 10px 18px; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 0 10px rgba(0, 240, 255, 0.4); }
+  .botao:hover { background: rgba(0, 240, 255, 0.12); }
+  .dica { font-size: 0.75rem; color: var(--suave); text-align: center; }
+</style>
+</head>
+<body>
+<header class="topo">
+  <a href="fliperama-neon.html" class="voltar">← Fliperama</a>
+  <h1>PONG</h1>
+  <div class="placar"><span>VITÓRIAS <b id="recorde">0</b></span></div>
+</header>
+
+<main>
+  <div class="area">
+    <canvas id="tela" width="600" height="400"></canvas>
+    <div class="aviso" id="aviso">
+      <h2 id="avisoTitulo">PONG</h2>
+      <p id="avisoTexto">Quem fizer 7 pontos primeiro vence. Escolha a dificuldade:</p>
+      <div class="niveis">
+        <button class="botao" data-nivel="0.55">FÁCIL</button>
+        <button class="botao" data-nivel="0.75">MÉDIO</button>
+        <button class="botao" data-nivel="0.95">DIFÍCIL</button>
+      </div>
+    </div>
+  </div>
+  <p class="dica">Mouse ou dedo arrastando na tela · W/S ou setas ↑ ↓ · P pausa</p>
+</main>
+
+<script>
+  const tela = document.getElementById("tela");
+  const ctx = tela.getContext("2d");
+  const L = tela.width, A = tela.height;
+  const RAQ_A = 80, RAQ_L = 12, BOLA = 10, PONTOS_VITORIA = 7;
+  const CHAVE = "fliperama_pong";
+
+  let jogador, cpu, bola, placar, nivel = 0.75, rodando = false, pausado = false, ultimo = 0, espera = 0;
+  let teclas = {};
+  let vitorias = ler();
+  document.getElementById("recorde").textContent = vitorias;
+
+  function ler() { try { return Number(localStorage.getItem(CHAVE)) || 0; } catch (e) { return 0; } }
+  function salvar(v) { try { localStorage.setItem(CHAVE, v); } catch (e) {} }
+
+  let audio = null;
+  function bip(freq, dur, tipo = "square", vol = 0.06) {
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = tipo; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, audio.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + dur);
+      o.connect(g).connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + dur);
+    } catch (e) {}
+  }
+
+  function iniciar(n) {
+    nivel = n;
+    jogador = { y: A / 2 - RAQ_A / 2 };
+    cpu = { y: A / 2 - RAQ_A / 2 };
+    placar = { voce: 0, cpu: 0 };
+    sacar(Math.random() > 0.5 ? 1 : -1);
+    rodando = true;
+    pausado = false;
+    document.getElementById("aviso").classList.add("escondido");
+    ultimo = performance.now();
+    requestAnimationFrame(laco);
+  }
+
+  function sacar(lado) {
+    const ang = (Math.random() - 0.5) * 0.8;
+    bola = { x: L / 2, y: A / 2, vx: Math.cos(ang) * 320 * lado, vy: Math.sin(ang) * 320 };
+    espera = 0.8; // pausa curtinha antes do saque
+  }
+
+  function laco(agora) {
+    if (!rodando) return;
+    const dt = Math.min(0.033, (agora - ultimo) / 1000);
+    ultimo = agora;
+    if (!pausado) atualizar(dt);
+    desenhar();
+    requestAnimationFrame(laco);
+  }
+
+  function atualizar(dt) {
+    // jogador pelo teclado
+    const v = 420 * dt;
+    if (teclas.KeyW || teclas.ArrowUp) jogador.y -= v;
+    if (teclas.KeyS || teclas.ArrowDown) jogador.y += v;
+    jogador.y = Math.max(0, Math.min(A - RAQ_A, jogador.y));
+
+    // computador segue a bola com velocidade limitada (depende da dificuldade)
+    const alvo = bola.vx > 0 ? bola.y - RAQ_A / 2 : A / 2 - RAQ_A / 2;
+    const maxCpu = 380 * nivel * dt;
+    cpu.y += Math.max(-maxCpu, Math.min(maxCpu, alvo - cpu.y));
+    cpu.y = Math.max(0, Math.min(A - RAQ_A, cpu.y));
+
+    if (espera > 0) { espera -= dt; return; }
+
+    bola.x += bola.vx * dt;
+    bola.y += bola.vy * dt;
+    if (bola.y < BOLA / 2 || bola.y > A - BOLA / 2) {
+      bola.vy *= -1;
+      bola.y = Math.max(BOLA / 2, Math.min(A - BOLA / 2, bola.y));
+      bip(300, 0.04);
+    }
+
+    // rebate nas raquetes: o ângulo depende de onde a bola bate
+    const rebater = (raqY, lado) => {
+      const meio = (bola.y - (raqY + RAQ_A / 2)) / (RAQ_A / 2);
+      const vel = Math.min(900, Math.hypot(bola.vx, bola.vy) * 1.06);
+      const ang = meio * 1.0;
+      bola.vx = Math.cos(ang) * vel * lado;
+      bola.vy = Math.sin(ang) * vel;
+      bip(lado > 0 ? 520 : 440, 0.06);
+    };
+    if (bola.vx < 0 && bola.x - BOLA / 2 < 20 + RAQ_L && bola.x > 10 && bola.y > jogador.y - 4 && bola.y < jogador.y + RAQ_A + 4) {
+      bola.x = 20 + RAQ_L + BOLA / 2;
+      rebater(jogador.y, 1);
+    }
+    if (bola.vx > 0 && bola.x + BOLA / 2 > L - 20 - RAQ_L && bola.x < L - 10 && bola.y > cpu.y - 4 && bola.y < cpu.y + RAQ_A + 4) {
+      bola.x = L - 20 - RAQ_L - BOLA / 2;
+      rebater(cpu.y, -1);
+    }
+
+    if (bola.x < -20) { placar.cpu++; bip(150, 0.3, "sawtooth"); verificar(-1); }
+    if (bola.x > L + 20) { placar.voce++; bip(880, 0.15); bip(1320, 0.2); verificar(1); }
+  }
+
+  function verificar(ladoSaque) {
+    if (placar.voce >= PONTOS_VITORIA || placar.cpu >= PONTOS_VITORIA) {
+      rodando = false;
+      const venceu = placar.voce > placar.cpu;
+      if (venceu) { vitorias++; salvar(vitorias); document.getElementById("recorde").textContent = vitorias; }
+      desenhar();
+      document.getElementById("avisoTitulo").textContent = venceu ? "VOCÊ VENCEU! 🏆" : "O COMPUTADOR VENCEU";
+      document.getElementById("avisoTexto").textContent = `Placar: ${placar.voce} x ${placar.cpu}. Jogar de novo?`;
+      document.getElementById("aviso").classList.remove("escondido");
+      return;
+    }
+    sacar(ladoSaque);
+  }
+
+  function desenhar() {
+    ctx.fillStyle = "#06041a";
+    ctx.fillRect(0, 0, L, A);
+    // rede
+    ctx.fillStyle = "rgba(0,240,255,0.25)";
+    for (let y = 8; y < A; y += 24) ctx.fillRect(L / 2 - 2, y, 4, 12);
+    // placar
+    ctx.font = "32px 'Press Start 2P', monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(241,238,255,0.35)";
+    if (placar) {
+      ctx.fillText(placar.voce, L / 2 - 60, 50);
+      ctx.fillText(placar.cpu, L / 2 + 60, 50);
+    }
+    ctx.shadowBlur = 16;
+    // raquetes
+    ctx.shadowColor = ctx.fillStyle = "#00f0ff";
+    if (jogador) ctx.fillRect(20, jogador.y, RAQ_L, RAQ_A);
+    ctx.shadowColor = ctx.fillStyle = "#ff2bd6";
+    if (cpu) ctx.fillRect(L - 20 - RAQ_L, cpu.y, RAQ_L, RAQ_A);
+    // bola
+    if (bola) {
+      ctx.shadowColor = ctx.fillStyle = "#ffe600";
+      ctx.beginPath();
+      ctx.arc(bola.x, bola.y, BOLA / 2 + 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  // Mouse ou dedo controlam a raquete
+  function moverPara(clientY) {
+    if (!jogador) return;
+    const r = tela.getBoundingClientRect();
+    const y = (clientY - r.top) * (A / r.height);
+    jogador.y = Math.max(0, Math.min(A - RAQ_A, y - RAQ_A / 2));
+  }
+  tela.addEventListener("mousemove", e => moverPara(e.clientY));
+  tela.addEventListener("touchmove", e => { e.preventDefault(); moverPara(e.touches[0].clientY); }, { passive: false });
+  tela.addEventListener("touchstart", e => moverPara(e.touches[0].clientY), { passive: true });
+
+  document.addEventListener("keydown", e => {
+    teclas[e.code] = true;
+    if (["ArrowUp", "ArrowDown", "Space"].includes(e.code)) e.preventDefault();
+    if (e.code === "KeyP" && rodando) {
+      pausado = !pausado;
+      document.getElementById("avisoTitulo").textContent = "PAUSADO";
+      document.getElementById("avisoTexto").textContent = "Aperte P para continuar";
+      document.querySelector(".niveis").style.display = pausado ? "none" : "";
+      document.getElementById("aviso").classList.toggle("escondido", !pausado);
+    }
+  });
+  document.addEventListener("keyup", e => teclas[e.code] = false);
+
+  document.querySelectorAll("[data-nivel]").forEach(b => b.addEventListener("click", () => {
+    document.querySelector(".niveis").style.display = "";
+    iniciar(Number(b.dataset.nivel));
+    b.blur();
+  }));
+
+  // tela inicial
+  jogador = { y: A / 2 - RAQ_A / 2 };
+  cpu = { y: A / 2 - RAQ_A / 2 };
+  bola = { x: L / 2, y: A / 2 };
+  desenhar();
+</script>
+</body>
+</html>

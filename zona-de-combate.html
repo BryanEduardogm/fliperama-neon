@@ -1,0 +1,2819 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zona de Combate</title>
+<style>
+  :root {
+    --fundo: #0d0f12;
+    --painel: rgba(16, 19, 24, 0.92);
+    --borda: #2c323b;
+    --texto: #eef1f4;
+    --suave: #9aa4b0;
+    --destaque: #f2a531;
+    --perigo: #e5484d;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--fundo);
+    color: var(--texto);
+    font-family: "Segoe UI", Arial, sans-serif;
+    user-select: none;
+  }
+
+  canvas { display: block; }
+
+  /* ===== Telas (menu, pausa, fim) ===== */
+  .tela {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 18px;
+    padding: 24px;
+    background: radial-gradient(circle at 50% 30%, rgba(40, 30, 15, 0.9), rgba(8, 9, 11, 0.97) 70%);
+    z-index: 20;
+    overflow-y: auto;
+  }
+
+  .tela.escondida { display: none; }
+  /* centraliza sem cortar o topo quando a janela é baixa */
+  .tela > :first-child { margin-top: auto; }
+  .tela > :last-child { margin-bottom: auto; }
+
+  .logo {
+    font-size: 3.2rem;
+    font-weight: 900;
+    letter-spacing: 6px;
+    color: var(--destaque);
+    text-shadow: 0 4px 0 #7a4c0c, 0 0 30px rgba(242, 165, 49, 0.4);
+    text-align: center;
+  }
+
+  .voltar-fliperama { align-self: flex-start; color: var(--suave); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--borda); padding: 6px 12px; border-radius: 8px; }
+  .voltar-fliperama:hover { color: var(--destaque); border-color: var(--destaque); }
+  .subtitulo { color: var(--suave); letter-spacing: 3px; font-size: 0.85rem; margin-top: -10px; }
+
+  .secao h2 {
+    font-size: 0.8rem;
+    letter-spacing: 3px;
+    color: var(--suave);
+    margin-bottom: 10px;
+    text-align: center;
+  }
+
+  .opcoes { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+  .cartao {
+    width: 170px;
+    background: var(--painel);
+    border: 2px solid var(--borda);
+    border-radius: 10px;
+    padding: 10px;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+  }
+
+  .cartao:hover { transform: translateY(-3px); }
+  .cartao.selecionado { border-color: var(--destaque); box-shadow: 0 0 16px rgba(242, 165, 49, 0.35); }
+
+  .painel-sens {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--painel);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 1.3rem;
+  }
+  .painel-sens input { width: min(260px, 50vw); accent-color: var(--destaque); cursor: pointer; }
+  .painel-sens .valor-sens { font-size: 1rem; color: var(--destaque); min-width: 44px; text-align: right; }
+  .painel-modelos {
+    margin-top: 14px;
+    padding: 14px;
+    border: 1px dashed var(--destaque);
+    border-radius: 12px;
+    background: rgba(16, 19, 24, 0.6);
+  }
+  .painel-modelos h2 { color: var(--destaque); }
+  .cartao .modelo-atual { font-size: 0.75rem; color: var(--destaque); margin-bottom: 4px; }
+  .cartao .qtd { font-size: 0.65rem; color: var(--suave); margin-top: 6px; }
+  .cartao .tag { font-size: 0.65rem; color: var(--suave); margin-top: 4px; }
+  .cartao .miniatura { height: 70px; border-radius: 6px; margin-bottom: 8px; }
+  .cartao h3 { font-size: 1rem; margin-bottom: 4px; }
+  .cartao p { font-size: 0.75rem; color: var(--suave); line-height: 1.4; }
+
+  .mini-deserto { background: linear-gradient(#9cc8ec 0 45%, #d9b877 45% 100%); }
+  .mini-armazem { background: linear-gradient(#22262c 0 30%, #b8452f 30% 55%, #2f5d8a 55% 75%, #6d6f72 75%); }
+  .mini-porto { background: linear-gradient(#f0a070 0 35%, #2a6f9a 35% 55%, #b8452f 55% 70%, #7a7c80 70%); }
+  .mini-base { background: linear-gradient(#a9c4d8 0 40%, #55613a 40% 55%, #76704a 55%); }
+  .mini-neve { background: linear-gradient(#cfd8e2 0 40%, #2f5a3a 40% 55%, #eef3f7 55%); }
+  .cartao.dificuldade { width: 150px; text-align: center; }
+  .cartao.dificuldade .icone { font-size: 1.8rem; margin-bottom: 4px; }
+  .mini-cidade { background: linear-gradient(90deg, #6f7680 0 25%, #9cc4e4 25% 75%, #8a7f74 75%); }
+
+  .barra { display: flex; align-items: center; gap: 6px; font-size: 0.65rem; color: var(--suave); margin-top: 4px; }
+  .barra span:first-child { width: 52px; }
+  .barra .trilho { flex: 1; height: 5px; background: #2a2f36; border-radius: 3px; overflow: hidden; }
+  .barra .cheio { height: 100%; background: var(--destaque); }
+
+  .botao {
+    background: var(--destaque);
+    color: #1a1206;
+    border: none;
+    border-radius: 8px;
+    padding: 14px 44px;
+    font-size: 1.1rem;
+    font-weight: 900;
+    letter-spacing: 3px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #7a4c0c;
+  }
+
+  .botao:hover { filter: brightness(1.1); }
+  .botao.secundario { background: #3a414b; color: var(--texto); box-shadow: 0 4px 0 #1d2127; }
+
+  .controles-lista {
+    font-size: 0.8rem;
+    color: var(--suave);
+    text-align: center;
+    line-height: 1.8;
+  }
+
+  .controles-lista b { color: var(--texto); background: #2a2f36; padding: 1px 6px; border-radius: 4px; }
+
+  .arsenal {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 14px;
+    width: 100%;
+    max-width: 1320px;
+  }
+
+  .arsenal h2 { font-size: 0.8rem; letter-spacing: 3px; color: var(--suave); margin-bottom: 8px; text-align: center; }
+  .arsenal .cartao { width: 100%; margin-bottom: 8px; }
+  .arsenal .cartao .tag { font-size: 0.65rem; color: var(--suave); }
+
+  @media (max-width: 1100px) { .arsenal { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 700px) { .arsenal { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  .titulo-fim { font-size: 2.6rem; font-weight: 900; letter-spacing: 4px; }
+  .titulo-fim.vitoria { color: var(--destaque); }
+  .titulo-fim.derrota { color: var(--perigo); }
+  .estatisticas { color: var(--suave); text-align: center; line-height: 1.8; }
+  .linha-botoes { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+  /* ===== HUD ===== */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #hud.escondido { display: none; }
+
+  #mira { position: absolute; left: 50%; top: 50%; }
+  #mira div { position: absolute; background: #7dff7d; box-shadow: 0 0 2px #000; }
+  #mira .h { width: 9px; height: 2px; top: -1px; }
+  #mira .v { width: 2px; height: 9px; left: -1px; }
+  #mira.escondida { display: none; }
+
+  #acerto {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 22px;
+    height: 22px;
+    transform: translate(-50%, -50%) rotate(45deg);
+    opacity: 0;
+  }
+
+  #acerto::before, #acerto::after {
+    content: "";
+    position: absolute;
+    background: #fff;
+  }
+
+  #acerto::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #acerto::after { top: 10px; left: 0; height: 2px; width: 22px; }
+  #acerto.morte::before, #acerto.morte::after { background: var(--perigo); }
+
+  .caixa-hud {
+    position: absolute;
+    background: rgba(10, 12, 15, 0.6);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: 700;
+  }
+
+  #caixaVida { left: 20px; bottom: 20px; display: flex; align-items: center; gap: 10px; font-size: 1.8rem; }
+  #caixaVida small { font-size: 0.7rem; color: var(--suave); letter-spacing: 2px; }
+  #barraVida { width: 140px; height: 8px; background: #2a2f36; border-radius: 4px; overflow: hidden; }
+  #barraVida div { height: 100%; width: 100%; background: #6fdc6f; transition: width 0.15s; }
+
+  #postura {
+    position: absolute;
+    left: 20px;
+    bottom: 96px;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    color: var(--destaque);
+    text-shadow: 0 1px 3px #000;
+  }
+
+  #caixaArma { right: 20px; bottom: 20px; text-align: right; }
+  #granadas { font-size: 0.85rem; margin-bottom: 4px; }
+  #granadas small { color: var(--suave); }
+  #nomeArma { font-size: 0.75rem; color: var(--suave); letter-spacing: 2px; }
+  #municao { font-size: 1.9rem; }
+  #municao small { font-size: 1rem; color: var(--suave); }
+
+  #slots { position: absolute; right: 20px; bottom: 130px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+  #slots div { font-size: 0.75rem; color: var(--suave); background: rgba(10, 12, 15, 0.5); padding: 3px 8px; border-radius: 4px; }
+  #slots div.ativo { color: #1a1206; background: var(--destaque); }
+
+  #placar { left: 50%; top: 14px; transform: translateX(-50%); text-align: center; font-size: 0.85rem; letter-spacing: 1px; }
+  #placar b { color: var(--destaque); }
+
+  #feed { position: absolute; right: 20px; top: 20px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+  #feed div { background: rgba(10, 12, 15, 0.7); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; }
+  #feed .hs { color: var(--destaque); }
+
+  #aviso-centro {
+    position: absolute;
+    left: 50%;
+    top: 62%;
+    transform: translateX(-50%);
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--destaque);
+    text-shadow: 0 2px 4px #000;
+  }
+
+  #dano {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, transparent 45%, rgba(200, 0, 0, 0.75));
+    opacity: 0;
+  }
+
+  /* Luneta da sniper */
+  #luneta {
+    position: absolute;
+    inset: 0;
+    display: none;
+    background: radial-gradient(circle at center, transparent 0 34vh, #000 34.3vh);
+  }
+
+  #luneta::before, #luneta::after { content: ""; position: absolute; background: #000; }
+  #luneta::before { left: 0; right: 0; top: 50%; height: 1px; }
+  #luneta::after { top: 0; bottom: 0; left: 50%; width: 1px; }
+  #luneta.ativa { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ===== Menu ===== -->
+<div class="tela" id="menu">
+  <a href="fliperama-neon.html" class="voltar-fliperama">← Voltar ao Fliperama</a>
+  <div class="logo">ZONA DE COMBATE</div>
+  <div class="subtitulo">TIRO TÁTICO EM PRIMEIRA PESSOA</div>
+
+  <div class="secao">
+    <h2>ESCOLHA O MAPA</h2>
+    <div class="opcoes" id="opcoesMapa">
+      <div class="cartao selecionado" data-mapa="deserto">
+        <div class="miniatura mini-deserto"></div>
+        <h3>Deserto</h3>
+        <p>Muros de arenito, caixas e corredores sob o sol.</p>
+      </div>
+      <div class="cartao" data-mapa="armazem">
+        <div class="miniatura mini-armazem"></div>
+        <h3>Armazém</h3>
+        <p>Galpão escuro cheio de contêineres e prateleiras.</p>
+      </div>
+      <div class="cartao" data-mapa="cidade">
+        <div class="miniatura mini-cidade"></div>
+        <h3>Cidade</h3>
+        <p>Ruas abertas, prédios altos e carros para se proteger.</p>
+      </div>
+      <div class="cartao" data-mapa="neve">
+        <div class="miniatura mini-neve"></div>
+        <h3>Vila na Neve</h3>
+        <p>Cabanas de madeira e pinheiros num vale congelado.</p>
+      </div>
+      <div class="cartao" data-mapa="base">
+        <div class="miniatura mini-base"></div>
+        <h3>Base Militar</h3>
+        <p>Bunkers, torres de vigia e barris explosivos.</p>
+      </div>
+      <div class="cartao" data-mapa="porto">
+        <div class="miniatura mini-porto"></div>
+        <h3>Porto</h3>
+        <p>Pôr do sol no cais: contêineres, guindastes e um navio.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="secao">
+    <h2>ESCOLHA A DIFICULDADE</h2>
+    <div class="opcoes" id="opcoesDificuldade">
+      <div class="cartao dificuldade" data-dificuldade="basico">
+        <div class="icone">🟢</div>
+        <h3>Básico</h3>
+        <p>Bots lentos e com mira ruim. Ótimo para aprender.</p>
+      </div>
+      <div class="cartao dificuldade selecionado" data-dificuldade="mediano">
+        <div class="icone">🟡</div>
+        <h3>Mediano</h3>
+        <p>Bots equilibrados. Um bom desafio.</p>
+      </div>
+      <div class="cartao dificuldade" data-dificuldade="avancado">
+        <div class="icone">🔴</div>
+        <h3>Avançado</h3>
+        <p>Bots rápidos, certeiros e em maior número.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="secao">
+    <h2>SENSIBILIDADE DO MOUSE</h2>
+    <div class="painel-sens">
+      <span title="Mais lento">🐢</span>
+      <input type="range" class="sens" min="0.2" max="3" step="0.1" value="1" aria-label="Sensibilidade do mouse">
+      <span title="Mais rápido">🐇</span>
+      <b class="valor-sens">1.0x</b>
+    </div>
+  </div>
+
+  <div class="secao">
+    <h2>ESCOLHA A ARMA</h2>
+    <div class="opcoes" id="opcoesArma"></div>
+    <div class="painel-modelos" id="painelModelos">
+      <h2 id="tituloModelos"></h2>
+      <div class="opcoes" id="opcoesModelo"></div>
+    </div>
+  </div>
+
+  <button class="botao" id="botaoJogar">JOGAR</button>
+
+  <div class="controles-lista">
+    <b>W A S D</b> andar &nbsp; <b>Mouse</b> mirar &nbsp; <b>Clique</b> atirar &nbsp; <b>Botão direito</b> zoom<br>
+    <b>R</b> recarregar &nbsp; <b>1</b> pistola <b>2</b> fuzil <b>3</b> SMG <b>4</b> escopeta <b>5</b> sniper &nbsp; <b>Q</b> faca &nbsp; <b>E</b> granada &nbsp; <b>Espaço</b> pular &nbsp; <b>B</b> arsenal (mais armas) &nbsp; <b>Shift</b> correr &nbsp; <b>C</b> agachar &nbsp; <b>P</b> pausar
+  </div>
+</div>
+
+<!-- ===== Pausa ===== -->
+<div class="tela escondida" id="pausa">
+  <div class="titulo-fim vitoria">PAUSADO</div>
+  <div class="secao">
+    <h2>SENSIBILIDADE DO MOUSE</h2>
+    <div class="painel-sens">
+      <span title="Mais lento">🐢</span>
+      <input type="range" class="sens" min="0.2" max="3" step="0.1" value="1" aria-label="Sensibilidade do mouse">
+      <span title="Mais rápido">🐇</span>
+      <b class="valor-sens">1.0x</b>
+    </div>
+  </div>
+  <div class="linha-botoes">
+    <button class="botao" id="botaoContinuar">CONTINUAR</button>
+    <button class="botao secundario" id="botaoMenuPausa">MENU</button>
+  </div>
+</div>
+
+<!-- ===== Arsenal ===== -->
+<div class="tela escondida" id="arsenal">
+  <div class="titulo-fim vitoria">ARSENAL</div>
+  <div class="subtitulo">CLIQUE PARA EQUIPAR · A ARMA VEM COM MUNIÇÃO CHEIA</div>
+  <div class="arsenal" id="colunasArsenal"></div>
+  <button class="botao" id="botaoFecharArsenal">VOLTAR AO JOGO (B)</button>
+</div>
+
+<!-- ===== Fim de rodada ===== -->
+<div class="tela escondida" id="fim">
+  <div class="titulo-fim" id="tituloFim"></div>
+  <div class="estatisticas" id="textoFim"></div>
+  <div class="linha-botoes">
+    <button class="botao" id="botaoProxima">PRÓXIMA RODADA</button>
+    <button class="botao secundario" id="botaoMenuFim">MENU</button>
+  </div>
+</div>
+
+<!-- ===== HUD ===== -->
+<div id="hud" class="escondido">
+  <div id="dano"></div>
+  <div id="luneta"></div>
+  <div id="mira">
+    <div class="h" id="miraE"></div>
+    <div class="h" id="miraD"></div>
+    <div class="v" id="miraC"></div>
+    <div class="v" id="miraB"></div>
+  </div>
+  <div id="acerto"></div>
+  <div class="caixa-hud" id="placar"><span id="nomeDificuldade"></span> &nbsp;·&nbsp; RODADA <b id="rodada">1</b> &nbsp;·&nbsp; INIMIGOS <b id="restantes">0</b> &nbsp;·&nbsp; ABATES <b id="abates">0</b></div>
+  <div id="feed"></div>
+  <div id="aviso-centro"></div>
+  <div id="postura"></div>
+  <div class="caixa-hud" id="caixaVida">
+    <div><small>VIDA</small><div id="valorVida">100</div></div>
+    <div id="barraVida"><div></div></div>
+  </div>
+  <div id="slots"></div>
+  <div class="caixa-hud" id="caixaArma">
+    <div id="granadas">💣 × 3 <small>[E]</small></div>
+    <div id="nomeArma">FUZIL</div>
+    <div id="municao">30 <small>/ 90</small></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// =====================================================================
+//  ZONA DE COMBATE — jogo de tiro em primeira pessoa com bots
+// =====================================================================
+
+// ===== Armas =====
+// Cada tipo (pistola, fuzil, sniper, escopeta) tem várias opções.
+// No jogo, aperte B para abrir o Arsenal e trocar o modelo.
+const VARIANTES = {
+  pistola: [
+    { nome: "Pistola 9mm", modelo: "pistola", som: "pistola", dano: 28, cadencia: 220, automatica: false,
+      pente: 12, reserva: 60, recarga: 1.3, dispersao: 0.012, dispersaoMira: 0.004, dispersaoMov: 0.02,
+      spray: 0.006, chumbos: 1, alcance: 120, coice: 0.018, fovMira: 60, velocidade: 1,
+      descricao: "Leve e precisa. Boa reserva.", stats: { dano: 30, cadencia: 55, precisao: 75 } },
+    { nome: "Revólver .38", modelo: "revolver", som: "revolver", dano: 52, cadencia: 450, automatica: false,
+      pente: 6, reserva: 36, recarga: 2.2, dispersao: 0.01, dispersaoMira: 0.003, dispersaoMov: 0.025,
+      spray: 0.01, chumbos: 1, alcance: 130, coice: 0.04, fovMira: 58, velocidade: 1,
+      descricao: "Lento, mas forte. Na cabeça, mata.", stats: { dano: 55, cadencia: 30, precisao: 85 } },
+    { nome: "Pistola Pesada", modelo: "pistolaPesada", som: "pesada", dano: 60, cadencia: 380, automatica: false,
+      pente: 7, reserva: 35, recarga: 1.8, dispersao: 0.02, dispersaoMira: 0.006, dispersaoMov: 0.04,
+      spray: 0.015, chumbos: 1, alcance: 140, coice: 0.05, fovMira: 58, velocidade: 0.97,
+      descricao: "Muito dano e muito coice.", stats: { dano: 65, cadencia: 35, precisao: 60 } },
+    { nome: "Pistola Automática", modelo: "pistolaAuto", som: "smg", dano: 20, cadencia: 85, automatica: true,
+      pente: 20, reserva: 80, recarga: 1.6, dispersao: 0.025, dispersaoMira: 0.012, dispersaoMov: 0.03,
+      spray: 0.008, chumbos: 1, alcance: 80, coice: 0.01, fovMira: 62, velocidade: 1,
+      descricao: "Rajada rápida, pouca precisão.", stats: { dano: 20, cadencia: 95, precisao: 40 } }
+  ],
+  fuzil: [
+    { nome: "Fuzil AK", modelo: "fuzil", som: "fuzil", dano: 34, cadencia: 105, automatica: true,
+      pente: 30, reserva: 90, recarga: 2.3, dispersao: 0.018, dispersaoMira: 0.008, dispersaoMov: 0.05,
+      spray: 0.007, chumbos: 1, alcance: 150, coice: 0.012, fovMira: 55, velocidade: 0.92,
+      descricao: "Automático e forte. Segure o clique.", stats: { dano: 45, cadencia: 90, precisao: 60 } },
+    { nome: "Fuzil M4", modelo: "m4", som: "m4", dano: 29, cadencia: 92, automatica: true,
+      pente: 30, reserva: 90, recarga: 2.0, dispersao: 0.014, dispersaoMira: 0.005, dispersaoMov: 0.045,
+      spray: 0.005, chumbos: 1, alcance: 150, coice: 0.009, fovMira: 52, velocidade: 0.94,
+      descricao: "Mais estável e precisa que a AK.", stats: { dano: 38, cadencia: 92, precisao: 72 } },
+    { nome: "Fuzil de Batalha", modelo: "fal", som: "pesada", dano: 44, cadencia: 150, automatica: true,
+      pente: 20, reserva: 80, recarga: 2.5, dispersao: 0.016, dispersaoMira: 0.006, dispersaoMov: 0.055,
+      spray: 0.01, chumbos: 1, alcance: 170, coice: 0.02, fovMira: 50, velocidade: 0.88,
+      descricao: "Muito dano por tiro, coice forte.", stats: { dano: 55, cadencia: 70, precisao: 65 } },
+    { nome: "Fuzil Bullpup", modelo: "bullpup", som: "m4", dano: 30, cadencia: 85, automatica: true,
+      pente: 30, reserva: 90, recarga: 2.2, dispersao: 0.012, dispersaoMira: 0.004, dispersaoMov: 0.04,
+      spray: 0.005, chumbos: 1, alcance: 160, coice: 0.009, fovMira: 45, velocidade: 0.95,
+      descricao: "Compacto, com luneta curta: zoom maior.", stats: { dano: 40, cadencia: 95, precisao: 78 } }
+  ],
+  smg: [
+    { nome: "SMG Compacta", modelo: "smg", som: "smg", dano: 21, cadencia: 70, automatica: true,
+      pente: 32, reserva: 128, recarga: 1.8, dispersao: 0.024, dispersaoMira: 0.014, dispersaoMov: 0.025,
+      spray: 0.006, chumbos: 1, alcance: 70, coice: 0.007, fovMira: 62, velocidade: 1.06,
+      descricao: "Rapidíssima e leve. Fraca de longe.", stats: { dano: 22, cadencia: 100, precisao: 45 } },
+    { nome: "SMG Tática", modelo: "smgTatica", som: "smg", dano: 24, cadencia: 80, automatica: true,
+      pente: 30, reserva: 120, recarga: 2.0, dispersao: 0.016, dispersaoMira: 0.008, dispersaoMov: 0.02,
+      spray: 0.005, chumbos: 1, alcance: 90, coice: 0.006, fovMira: 58, velocidade: 1.03,
+      descricao: "Equilibrada e precisa para uma SMG.", stats: { dano: 26, cadencia: 90, precisao: 62 } },
+    { nome: "SMG Silenciada", modelo: "smgSilenciada", som: "silenciada", dano: 23, cadencia: 85, automatica: true,
+      pente: 25, reserva: 100, recarga: 2.0, dispersao: 0.018, dispersaoMira: 0.009, dispersaoMov: 0.022,
+      spray: 0.005, chumbos: 1, alcance: 80, coice: 0.005, fovMira: 60, velocidade: 1.04, silenciosa: true,
+      descricao: "Quase sem barulho: bots longe não ouvem.", stats: { dano: 24, cadencia: 85, precisao: 58 } },
+    { nome: "SMG de Alta Capacidade", modelo: "smgP90", som: "smg", dano: 19, cadencia: 65, automatica: true,
+      pente: 50, reserva: 150, recarga: 2.6, dispersao: 0.02, dispersaoMira: 0.01, dispersaoMov: 0.024,
+      spray: 0.005, chumbos: 1, alcance: 80, coice: 0.006, fovMira: 60, velocidade: 1.04,
+      descricao: "Pente de 50 balas. Recarrega pouco.", stats: { dano: 20, cadencia: 100, precisao: 52 } }
+  ],
+  sniper: [
+    { nome: "Sniper Pesada", modelo: "sniper", som: "sniper", dano: 150, cadencia: 1350, automatica: false,
+      pente: 5, reserva: 20, recarga: 3.0, dispersao: 0.07, dispersaoMira: 0, dispersaoMov: 0.08,
+      spray: 0, chumbos: 1, alcance: 250, coice: 0.05, fovMira: 18, velocidade: 0.82, sairDoZoom: true,
+      descricao: "Um tiro, um abate. Use o zoom.", stats: { dano: 100, cadencia: 12, precisao: 100 } },
+    { nome: "Sniper Leve", modelo: "scout", som: "scout", dano: 80, cadencia: 1000, automatica: false,
+      pente: 10, reserva: 30, recarga: 2.4, dispersao: 0.04, dispersaoMira: 0, dispersaoMov: 0.05,
+      spray: 0, chumbos: 1, alcance: 220, coice: 0.035, fovMira: 25, velocidade: 0.98, sairDoZoom: true,
+      descricao: "Ágil. Na cabeça, mata.", stats: { dano: 70, cadencia: 25, precisao: 95 } },
+    { nome: "Sniper Semiautomática", modelo: "sniperSemi", som: "semi", dano: 85, cadencia: 420, automatica: false,
+      pente: 15, reserva: 45, recarga: 3.2, dispersao: 0.08, dispersaoMira: 0.003, dispersaoMov: 0.09,
+      spray: 0.004, chumbos: 1, alcance: 220, coice: 0.045, fovMira: 22, velocidade: 0.78,
+      descricao: "Tiros seguidos sem sair do zoom. Pesada.", stats: { dano: 75, cadencia: 45, precisao: 85 } },
+    { nome: "Sniper Antimaterial", modelo: "antimaterial", som: "cano", dano: 220, cadencia: 1800, automatica: false,
+      pente: 4, reserva: 12, recarga: 3.6, dispersao: 0.09, dispersaoMira: 0, dispersaoMov: 0.1,
+      spray: 0, chumbos: 1, alcance: 300, coice: 0.08, fovMira: 14, velocidade: 0.72, sairDoZoom: true,
+      descricao: "A mais forte do jogo. Derruba até o Pesado.", stats: { dano: 100, cadencia: 8, precisao: 100 } }
+  ],
+  escopeta: [
+    { nome: "Escopeta Pump", modelo: "escopeta", som: "escopeta", dano: 17, cadencia: 850, automatica: false,
+      pente: 8, reserva: 32, recarga: 2.6, dispersao: 0.075, dispersaoMira: 0.06, dispersaoMov: 0.02,
+      spray: 0, chumbos: 9, alcance: 35, coice: 0.04, fovMira: 65, velocidade: 0.95,
+      descricao: "Devastadora de perto.", stats: { dano: 90, cadencia: 25, precisao: 25 } },
+    { nome: "Escopeta Automática", modelo: "escopetaAuto", som: "escopeta", dano: 13, cadencia: 300, automatica: false,
+      pente: 7, reserva: 35, recarga: 2.8, dispersao: 0.085, dispersaoMira: 0.07, dispersaoMov: 0.025,
+      spray: 0, chumbos: 7, alcance: 30, coice: 0.035, fovMira: 65, velocidade: 0.93,
+      descricao: "Atira rápido; cada tiro é mais fraco.", stats: { dano: 65, cadencia: 60, precisao: 20 } },
+    { nome: "Cano Duplo", modelo: "canoDuplo", som: "cano", dano: 16, cadencia: 350, automatica: false,
+      pente: 2, reserva: 30, recarga: 2.2, dispersao: 0.09, dispersaoMira: 0.075, dispersaoMov: 0.02,
+      spray: 0, chumbos: 12, alcance: 28, coice: 0.06, fovMira: 66, velocidade: 0.97,
+      descricao: "Dois tiros arrasadores, recarga longa.", stats: { dano: 100, cadencia: 40, precisao: 15 } },
+    { nome: "Escopeta Tática", modelo: "escopetaTatica", som: "escopeta", dano: 15, cadencia: 600, automatica: false,
+      pente: 10, reserva: 40, recarga: 2.4, dispersao: 0.06, dispersaoMira: 0.045, dispersaoMov: 0.02,
+      spray: 0, chumbos: 8, alcance: 42, coice: 0.035, fovMira: 62, velocidade: 0.95,
+      descricao: "Chumbo mais concentrado: alcança mais longe.", stats: { dano: 75, cadencia: 40, precisao: 35 } }
+  ],
+  faca: [
+    { nome: "Faca de Combate", modelo: "faca", dano: 55, danoForte: 100, cadencia: 420, cadenciaForte: 1000,
+      automatica: true, corpoACorpo: true, alcance: 2.3, velocidade: 1.15,
+      descricao: "Equilibrada. Botão direito = facada forte.", stats: { dano: 70, cadencia: 70, precisao: 60 } },
+    { nome: "Karambit", modelo: "karambit", dano: 45, danoForte: 85, cadencia: 300, cadenciaForte: 800,
+      automatica: true, corpoACorpo: true, alcance: 2.0, velocidade: 1.2,
+      descricao: "Lâmina curva: cortes rapidíssimos.", stats: { dano: 55, cadencia: 95, precisao: 50 } },
+    { nome: "Machete", modelo: "machete", dano: 75, danoForte: 130, cadencia: 650, cadenciaForte: 1300,
+      automatica: true, corpoACorpo: true, alcance: 2.8, velocidade: 1.05,
+      descricao: "Pesada e comprida: golpes lentos e fortes.", stats: { dano: 95, cadencia: 40, precisao: 80 } },
+    { nome: "Baioneta", modelo: "baioneta", dano: 50, danoForte: 115, cadencia: 450, cadenciaForte: 900,
+      automatica: true, corpoACorpo: true, alcance: 2.6, velocidade: 1.12,
+      descricao: "Estocada forte e alcance maior.", stats: { dano: 75, cadencia: 65, precisao: 75 } }
+  ]
+};
+
+const TECLAS_ARMA = { pistola: 1, fuzil: 2, smg: 3, escopeta: 4, sniper: 5, faca: "Q" };
+const NOMES_TIPO = { pistola: "PISTOLAS", fuzil: "FUZIS", sniper: "SNIPERS", escopeta: "ESCOPETAS", smg: "SMGs", faca: "FACAS" };
+const varianteAtual = { pistola: 0, fuzil: 0, sniper: 0, escopeta: 0, smg: 0, faca: 0 };
+const ARMAS = {};
+// Valores que as facas não usam (não têm munição nem mira)
+const PADRAO_CORPO_A_CORPO = { pente: 0, reserva: 0, recarga: 0, dispersao: 0, dispersaoMira: 0, dispersaoMov: 0,
+                               spray: 0, chumbos: 0, coice: 0, fovMira: 75 };
+function aplicarVariante(tipo, indice) {
+  varianteAtual[tipo] = indice;
+  const v = VARIANTES[tipo][indice];
+  ARMAS[tipo] = { ...(v.corpoACorpo ? PADRAO_CORPO_A_CORPO : {}), ...v, tecla: TECLAS_ARMA[tipo] };
+}
+Object.keys(VARIANTES).forEach(tipo => aplicarVariante(tipo, 0));
+
+// Ordem das teclas 1 a 5; a faca fica no Q
+const ORDEM_ARMAS = ["pistola", "fuzil", "smg", "escopeta", "sniper", "faca"];
+
+const NOMES_BOTS = ["Bot Zé", "Bot Rato", "Bot Tonhão", "Bot Faísca", "Bot Careca",
+                    "Bot Tijolo", "Bot Sombra", "Bot Bigode", "Bot Pipoca", "Bot Trovão"];
+
+// ===== Escolhas do menu =====
+let mapaEscolhido = "deserto";
+let armaEscolhida = "fuzil";
+let dificuldadeEscolhida = "mediano";
+
+// Cada nível muda a mira, o dano, a reação, o alcance de visão e a quantidade de bots.
+// "crescimento" é o quanto os bots melhoram a cada rodada vencida.
+const DIFICULDADES = {
+  basico: {
+    nome: "BÁSICO", precisao: 0.35, dano: [4, 7], reacao: [1.0, 1.6], cadencia: [0.7, 1.1],
+    visao: 32, campoVisao: 0.5, botsInicio: 2, botsMax: 5, crescimento: 0.03, velocidade: 0.8
+  },
+  mediano: {
+    nome: "MEDIANO", precisao: 0.6, dano: [6, 10], reacao: [0.65, 1.1], cadencia: [0.45, 0.8],
+    visao: 45, campoVisao: 0.3, botsInicio: 3, botsMax: 7, crescimento: 0.05, velocidade: 0.9
+  },
+  avancado: {
+    nome: "AVANÇADO", precisao: 0.9, dano: [8, 13], reacao: [0.35, 0.7], cadencia: [0.28, 0.55],
+    visao: 60, campoVisao: 0.1, botsInicio: 4, botsMax: 9, crescimento: 0.07, velocidade: 1
+  }
+};
+let dif = DIFICULDADES.mediano;
+const sortear = ([min, max]) => min + Math.random() * (max - min);
+
+// Monta os cartões de arma no menu: primeiro a classe, depois os modelos dela
+const opcoesArma = document.getElementById("opcoesArma");
+const NOMES_CLASSE = { pistola: "Pistolas", fuzil: "Fuzis", smg: "SMGs", escopeta: "Escopetas", sniper: "Snipers", faca: "Facas" };
+
+function barrasStats(stats) {
+  return ["dano", "cadencia", "precisao"].map(s =>
+    `<div class="barra"><span>${{ dano: "Dano", cadencia: "Cadência", precisao: "Precisão" }[s]}</span>` +
+    `<div class="trilho"><div class="cheio" style="width:${stats[s]}%"></div></div></div>`).join("");
+}
+
+function desenharClasses() {
+  opcoesArma.innerHTML = ORDEM_ARMAS.map(id => `
+    <div class="cartao ${id === armaEscolhida ? "selecionado" : ""}" data-arma="${id}">
+      <h3>${NOMES_CLASSE[id]}</h3>
+      <div class="modelo-atual">▸ ${ARMAS[id].nome}</div>
+      ${barrasStats(ARMAS[id].stats)}
+      <div class="qtd">${VARIANTES[id].length} opções · clique para ver</div>
+    </div>`).join("");
+  opcoesArma.querySelectorAll(".cartao").forEach(c => c.addEventListener("click", () => {
+    armaEscolhida = c.dataset.arma;
+    desenharClasses();
+    desenharModelos();
+  }));
+}
+
+function desenharModelos() {
+  const tipo = armaEscolhida;
+  document.getElementById("tituloModelos").textContent = `ESCOLHA O MODELO · ${NOMES_CLASSE[tipo].toUpperCase()}`;
+  const caixa = document.getElementById("opcoesModelo");
+  caixa.innerHTML = VARIANTES[tipo].map((v, i) => `
+    <div class="cartao ${varianteAtual[tipo] === i ? "selecionado" : ""}" data-indice="${i}">
+      <h3>${v.nome}</h3>
+      <p>${v.descricao}</p>
+      <div class="tag">${v.corpoACorpo ? `Corpo a corpo · alcance ${v.alcance} m` : `${v.automatica ? "Automática" : "Semiautomática"} · ${v.pente} balas`}</div>
+      ${barrasStats(v.stats)}
+    </div>`).join("");
+  caixa.querySelectorAll(".cartao").forEach(c => c.addEventListener("click", () => {
+    trocarModelo(tipo, Number(c.dataset.indice));
+    desenharClasses();
+    desenharModelos();
+  }));
+}
+
+document.querySelectorAll("#opcoesMapa .cartao").forEach(c => c.addEventListener("click", () => {
+  document.querySelectorAll("#opcoesMapa .cartao").forEach(x => x.classList.remove("selecionado"));
+  c.classList.add("selecionado");
+  mapaEscolhido = c.dataset.mapa;
+}));
+
+document.querySelectorAll("#opcoesDificuldade .cartao").forEach(c => c.addEventListener("click", () => {
+  document.querySelectorAll("#opcoesDificuldade .cartao").forEach(x => x.classList.remove("selecionado"));
+  c.classList.add("selecionado");
+  dificuldadeEscolhida = c.dataset.dificuldade;
+}));
+
+
+// ===== Renderizador (configurado leve para notebooks sem placa de vídeo) =====
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+renderer.setPixelRatio(1);
+renderer.setSize(innerWidth, innerHeight);
+renderer.autoClear = false;
+document.body.appendChild(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 300);
+camera.rotation.order = "YXZ";
+
+// A arma na mão é desenhada numa cena separada, por cima de tudo
+// (assim ela nunca "entra" dentro das paredes)
+const cenaArma = new THREE.Scene();
+const cameraArma = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.01, 10);
+cenaArma.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.9));
+const luzArma = new THREE.DirectionalLight(0xffffff, 0.7);
+luzArma.position.set(1, 2, 1);
+cenaArma.add(luzArma);
+
+addEventListener("resize", () => {
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = cameraArma.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  cameraArma.updateProjectionMatrix();
+});
+
+// ===== Texturas desenhadas por código (nada de arquivos externos) =====
+function criarTextura(tamanho, desenhar) {
+  const c = document.createElement("canvas");
+  c.width = c.height = tamanho;
+  desenhar(c.getContext("2d"), tamanho);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+function ruido(ctx, t, base, intensidade, qtd = 4000) {
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, t, t);
+  for (let i = 0; i < qtd; i++) {
+    const claro = Math.random() > 0.5;
+    ctx.fillStyle = claro ? `rgba(255,255,255,${Math.random() * intensidade})` : `rgba(0,0,0,${Math.random() * intensidade})`;
+    ctx.fillRect(Math.random() * t, Math.random() * t, 2, 2);
+  }
+}
+
+const TEXTURAS = {
+  areia: criarTextura(128, (c, t) => ruido(c, t, "#d6b57a", 0.15)),
+  arenito: criarTextura(128, (c, t) => {
+    ruido(c, t, "#c9a46a", 0.12);
+    c.strokeStyle = "rgba(90,60,30,0.35)";
+    c.lineWidth = 2;
+    for (let y = 0; y <= t; y += 32) {
+      c.beginPath(); c.moveTo(0, y); c.lineTo(t, y); c.stroke();
+      const desloc = (y / 32) % 2 ? 32 : 0;
+      for (let x = desloc; x < t; x += 64) { c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + 32); c.stroke(); }
+    }
+  }),
+  caixa: criarTextura(128, (c, t) => {
+    ruido(c, t, "#9a6a35", 0.15, 1500);
+    c.strokeStyle = "#5e3c18";
+    c.lineWidth = 10;
+    c.strokeRect(5, 5, t - 10, t - 10);
+    c.beginPath(); c.moveTo(8, 8); c.lineTo(t - 8, t - 8); c.moveTo(t - 8, 8); c.lineTo(8, t - 8); c.stroke();
+  }),
+  concreto: criarTextura(128, (c, t) => ruido(c, t, "#7a7c80", 0.12)),
+  paredeArmazem: criarTextura(128, (c, t) => {
+    ruido(c, t, "#5a6068", 0.1);
+    c.fillStyle = "rgba(0,0,0,0.25)";
+    for (let x = 0; x < t; x += 16) c.fillRect(x, 0, 3, t);
+  }),
+  neve: criarTextura(128, (c, t) => ruido(c, t, "#e8eef4", 0.08)),
+  terra: criarTextura(128, (c, t) => ruido(c, t, "#76704a", 0.18, 6000)),
+  sacos: criarTextura(64, (c, t) => {
+    c.fillStyle = "#6e6448";
+    c.fillRect(0, 0, t, t);
+    for (let y = 0; y < t; y += 16) {
+      const desloc = (y / 16) % 2 ? 16 : 0;
+      for (let x = -16 + desloc; x < t; x += 32) {
+        c.fillStyle = "#b9a878";
+        c.beginPath();
+        c.ellipse(x + 16, y + 8, 15, 7, 0, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+  }),
+  madeira: criarTextura(128, (c, t) => {
+    ruido(c, t, "#7a5532", 0.12, 2000);
+    c.fillStyle = "rgba(40,22,8,0.55)";
+    for (let x = 0; x < t; x += 21) c.fillRect(x, 0, 3, t);
+  }),
+  asfalto: criarTextura(128, (c, t) => ruido(c, t, "#3c3d40", 0.18, 6000)),
+  tijolo: criarTextura(128, (c, t) => {
+    c.fillStyle = "#8a4b35";
+    c.fillRect(0, 0, t, t);
+    c.fillStyle = "#c9c0b0";
+    for (let y = 0; y < t; y += 16) {
+      c.fillRect(0, y, t, 2);
+      const desloc = (y / 16) % 2 ? 16 : 0;
+      for (let x = desloc; x < t; x += 32) c.fillRect(x, y, 2, 16);
+    }
+  }),
+  predio: criarTextura(128, (c, t) => {
+    ruido(c, t, "#8d8f94", 0.08, 1000);
+    for (let y = 12; y < t; y += 64) for (let x = 12; x < t; x += 64) {
+      c.fillStyle = "#2b3d52";
+      c.fillRect(x, y, 40, 36);
+      c.fillStyle = "rgba(160,200,240,0.35)";
+      c.fillRect(x, y, 40, 10);
+    }
+  }),
+  container: criarTextura(64, (c, t) => {
+    c.fillStyle = "#ffffff";
+    c.fillRect(0, 0, t, t);
+    c.fillStyle = "rgba(0,0,0,0.22)";
+    for (let x = 0; x < t; x += 8) c.fillRect(x, 0, 3, t);
+  })
+};
+
+// Guarda materiais já criados para reaproveitar
+const cacheMateriais = {};
+function material(nome, repX = 1, repY = 1, cor = 0xffffff) {
+  repX = Math.max(1, Math.round(repX));
+  repY = Math.max(1, Math.round(repY));
+  const chave = `${nome}_${repX}_${repY}_${cor}`;
+  if (!cacheMateriais[chave]) {
+    const tex = TEXTURAS[nome].clone();
+    tex.needsUpdate = true;
+    tex.repeat.set(repX, repY);
+    cacheMateriais[chave] = new THREE.MeshLambertMaterial({ map: tex, color: cor });
+  }
+  return cacheMateriais[chave];
+}
+
+// ===== Estado do mundo =====
+let cena = null;
+let solidos = [];     // tudo em que a bala bate e que bloqueia a visão
+let barris = [];      // barris explosivos
+let colisores = [];   // retângulos que bloqueiam o movimento
+let pontosRota = [];  // lugares livres por onde os bots andam
+let chao = null;
+let bots = [];
+let efeitos = [];
+let furos = [];
+let spawnJogador = { x: 0, z: -30, yaw: Math.PI };
+
+// Cria um bloco sólido (parede, caixa, prédio...)
+function bloco(x, z, w, d, h, tex, opcoes = {}) {
+  const y0 = opcoes.y0 || 0;
+  const escala = opcoes.escalaTextura || 4;
+  const mat = opcoes.material || material(tex, Math.max(w, d) / escala, h / escala, opcoes.cor);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y0 + h / 2, z);
+  cena.add(m);
+  solidos.push(m);
+  if (h > 0.3 && opcoes.colide !== false && y0 < 1.5) {
+    colisores.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, maxY: y0 + h });
+  }
+  return m;
+}
+
+function caixaMadeira(x, z, tamanho, y0 = 0) {
+  return bloco(x, z, tamanho, tamanho, tamanho, "caixa", { y0, material: material("caixa") });
+}
+
+// Barris explodem quando levam tiros ou pegam fogo de outra explosão
+const geoBarril = new THREE.CylinderGeometry(0.45, 0.45, 1.2, 12);
+const geoFaixaBarril = new THREE.CylinderGeometry(0.46, 0.46, 0.18, 12);
+const matFaixaBarril = new THREE.MeshLambertMaterial({ color: 0xf2c230 });
+function barril(x, z, cor = 0x8a2a20) {
+  const m = new THREE.Mesh(geoBarril, new THREE.MeshLambertMaterial({ color: cor }));
+  m.position.set(x, 0.6, z);
+  const faixa = new THREE.Mesh(geoFaixaBarril, matFaixaBarril); // faixa amarela de perigo
+  faixa.position.y = 0.25;
+  m.add(faixa);
+  cena.add(m);
+  solidos.push(m);
+  const colisor = { minX: x - 0.45, maxX: x + 0.45, minZ: z - 0.45, maxZ: z + 0.45, maxY: 1.2 };
+  colisores.push(colisor);
+  m.userData.barril = { vida: 25, explodido: false, colisor };
+  barris.push(m);
+}
+
+function ferirBarril(m, dano) {
+  const b = m.userData.barril;
+  if (b.explodido) return;
+  b.vida -= dano;
+  if (b.vida <= 0) explodirBarril(m);
+}
+
+function explodirBarril(m) {
+  const b = m.userData.barril;
+  if (b.explodido || !m.parent) return;
+  b.explodido = true;
+  cena.remove(m);
+  solidos = solidos.filter(x => x !== m);
+  colisores = colisores.filter(c => c !== b.colisor);
+  explodir(m.position.clone(), "🛢️", 1.2);
+}
+
+function prepararCena(corCeu, corNevoa, nevoaPerto, nevoaLonge, texChao, repChao) {
+  cena = new THREE.Scene();
+  cena.background = new THREE.Color(corCeu);
+  cena.fog = new THREE.Fog(corNevoa, nevoaPerto, nevoaLonge);
+  solidos = []; colisores = []; bots = []; efeitos = []; furos = []; barris = [];
+
+  chao = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), material(texChao, repChao, repChao));
+  chao.rotation.x = -Math.PI / 2;
+  cena.add(chao);
+  cena.add(camera);
+}
+
+function bordas(altura, tex) {
+  bloco(0, -37, 76, 2, altura, tex);
+  bloco(0, 37, 76, 2, altura, tex);
+  bloco(-37, 0, 2, 76, altura, tex);
+  bloco(37, 0, 2, 76, altura, tex);
+}
+
+// ===== Mapa 1: Deserto =====
+function mapaDeserto() {
+  prepararCena(0x9cc8ec, 0xe6d3a8, 35, 120, "areia", 20);
+  cena.add(new THREE.HemisphereLight(0xfff4dd, 0xb08a55, 0.85));
+  const sol = new THREE.DirectionalLight(0xfff0d0, 0.75);
+  sol.position.set(30, 50, 20);
+  cena.add(sol);
+
+  bordas(7, "arenito");
+
+  // Construções
+  bloco(-24, 20, 10, 12, 6, "arenito");
+  bloco(24, -20, 10, 12, 6, "arenito");
+  bloco(-23, -22, 8, 6, 5, "arenito");
+  bloco(23, 22, 8, 6, 5, "arenito");
+  bloco(0, 0, 7, 7, 4.5, "arenito");
+
+  // Muros do meio com passagens
+  bloco(-12, -6, 1.5, 22, 4, "arenito");
+  bloco(-12, 18, 1.5, 10, 4, "arenito");
+  bloco(12, 6, 1.5, 22, 4, "arenito");
+  bloco(12, -18, 1.5, 10, 4, "arenito");
+
+  // Arco perto do centro
+  bloco(-5, 14, 1.2, 1.2, 4.5, "arenito");
+  bloco(5, 14, 1.2, 1.2, 4.5, "arenito");
+  bloco(0, 14, 11.2, 1.2, 1, "arenito", { y0: 4.5, colide: false });
+
+  // Caixas de madeira (algumas empilhadas)
+  [[-4, -20, 2], [5, -14, 2], [-6, 9, 2], [6, 20, 2], [-20, -8, 2], [20, 8, 2],
+   [-28, 4, 2], [28, -4, 2], [0, -27, 2], [0, 28, 2], [-6, -6, 1.5], [6, 6, 1.5],
+   [-30, 29, 2], [30, -29, 2], [-18, 30, 1.5], [18, -30, 1.5]].forEach(([x, z, t]) => caixaMadeira(x, z, t));
+  caixaMadeira(-2.2, -20.3, 1.4);
+  caixaMadeira(-4, -20, 1.4, 2);
+  caixaMadeira(20, 8, 1.4, 2);
+  caixaMadeira(4.3, 20.5, 1.4);
+
+  [[-9, -26], [9, 26], [-30, -14], [30, 14], [16, 0], [-16, 2]].forEach(([x, z]) => barril(x, z, 0x8a3a2a));
+
+  spawnJogador = { x: 0, z: -32, yaw: Math.PI };
+}
+
+// ===== Mapa 2: Armazém =====
+function mapaArmazem() {
+  prepararCena(0x15181c, 0x15181c, 18, 60, "concreto", 16);
+  cena.add(new THREE.HemisphereLight(0xc8d2e0, 0x2a2622, 0.55));
+
+  bordas(9, "paredeArmazem");
+
+  // Teto e lâmpadas
+  const teto = new THREE.Mesh(new THREE.PlaneGeometry(76, 76), new THREE.MeshLambertMaterial({ color: 0x2a2d31 }));
+  teto.rotation.x = Math.PI / 2;
+  teto.position.y = 9;
+  cena.add(teto);
+  const matLampada = new THREE.MeshBasicMaterial({ color: 0xfff1c9 });
+  for (let x = -24; x <= 24; x += 16) for (let z = -24; z <= 24; z += 16) {
+    const l = new THREE.Mesh(new THREE.BoxGeometry(3, 0.15, 0.5), matLampada);
+    l.position.set(x, 8.9, z);
+    cena.add(l);
+  }
+  [[-16, -16], [16, -16], [-16, 16], [16, 16]].forEach(([x, z]) => {
+    const p = new THREE.PointLight(0xffe7b8, 0.9, 45);
+    p.position.set(x, 8, z);
+    cena.add(p);
+  });
+
+  // Contêineres coloridos
+  const cores = [0xb8452f, 0x2f5d8a, 0x3f7a45, 0xc7832b, 0x7a3f8a];
+  let i = 0;
+  [[-22, -18], [-22, 0], [-22, 18], [-8, -10], [-8, 14], [8, -14], [8, 10], [22, -18], [22, 0], [22, 18]].forEach(([x, z]) => {
+    const cor = cores[i++ % cores.length];
+    bloco(x, z, 2.6, 6, 2.6, "container", { cor, escalaTextura: 1.5 });
+    if (i % 3 === 0) bloco(x, z, 2.6, 6, 2.6, "container", { cor: cores[(i + 2) % cores.length], escalaTextura: 1.5, y0: 2.6 });
+  });
+
+  // Prateleiras altas nas paredes
+  [[-33, -12], [-33, 12], [33, -12], [33, 12]].forEach(([x, z]) => bloco(x, z, 1.4, 10, 4.5, "caixa", { material: material("caixa", 5, 2, 0x8a8a8a) }));
+
+  // Caixas soltas
+  [[-14, -26, 1.5], [14, 26, 1.5], [0, -20, 2], [0, 22, 2], [-15, 4, 1.5], [15, -4, 1.5],
+   [-2, 0, 1.5], [2.5, 1, 1.5], [-28, -30, 2], [28, 30, 2]].forEach(([x, z, t]) => caixaMadeira(x, z, t));
+  caixaMadeira(0, -20, 1.4, 2);
+  [[-4, -30], [4, 30], [-18, -22], [18, 22]].forEach(([x, z]) => barril(x, z, 0x2f5d8a));
+
+  spawnJogador = { x: 0, z: -32, yaw: Math.PI };
+}
+
+// ===== Mapa 3: Cidade =====
+function mapaCidade() {
+  prepararCena(0x9cc4e4, 0xbcd0e2, 35, 120, "asfalto", 20);
+  cena.add(new THREE.HemisphereLight(0xeaf4ff, 0x55534f, 0.85));
+  const sol = new THREE.DirectionalLight(0xffffff, 0.6);
+  sol.position.set(-30, 60, 25);
+  cena.add(sol);
+
+  bordas(5, "tijolo");
+
+  // Prédios
+  [[-22, -22, 14, 14, 16], [22, -22, 14, 14, 22], [-22, 22, 14, 14, 20], [22, 22, 14, 14, 13],
+   [-27, 0, 8, 10, 10], [27, 0, 8, 10, 15]].forEach(([x, z, w, d, h]) => {
+    bloco(x, z, w, d, h, "predio");
+    // calçada em volta (baixinha, não bloqueia)
+    bloco(x, z, w + 3, d + 3, 0.15, "concreto", { material: material("concreto", 4, 1, 0xbbbbbb) });
+  });
+
+  // Faixas brancas na rua
+  const matFaixa = new THREE.MeshBasicMaterial({ color: 0xe8e2c8 });
+  for (let z = -30; z <= 30; z += 6) {
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 2.5), matFaixa);
+    f.rotation.x = -Math.PI / 2;
+    f.position.set(0, 0.02, z);
+    cena.add(f);
+  }
+
+  // Praça central com fonte
+  bloco(0, 0, 5, 5, 0.9, "concreto", { material: material("concreto", 2, 1, 0xd0d0d0) });
+  const fonte = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 2.5, 10), new THREE.MeshLambertMaterial({ color: 0xc0c0c0 }));
+  fonte.position.set(0, 1.25, 0);
+  cena.add(fonte);
+  solidos.push(fonte);
+
+  // Carros
+  const carro = (x, z, deitado, cor) => {
+    const w = deitado ? 4.4 : 2, d = deitado ? 2 : 4.4;
+    const mat = new THREE.MeshLambertMaterial({ color: cor });
+    bloco(x, z, w, d, 1, null, { material: mat, y0: 0.3 });
+    bloco(x, z, deitado ? 2.2 : 1.8, deitado ? 1.8 : 2.2, 0.7, null, { material: new THREE.MeshLambertMaterial({ color: 0x223040 }), y0: 1.3 });
+  };
+  carro(-6, -12, false, 0xb03030);
+  carro(8, 5, true, 0x2050a0);
+  carro(-4, 15, false, 0xe0c040);
+  carro(6, -22, true, 0xf0f0f0);
+  carro(-32.5, -10, false, 0x40a060);
+  carro(32.5, 12, false, 0x303030);
+  carro(10, 30, true, 0x8040a0);
+  [[-15, -12], [15, 12], [-3, -18], [3, 18]].forEach(([x, z]) => barril(x, z));
+
+  // Barreiras de concreto
+  [[-10, 0, true], [10, -2, true], [0, 9, false], [-12, -30, false], [12, 30, false]].forEach(([x, z, deitada]) =>
+    bloco(x, z, deitada ? 0.6 : 3, deitada ? 3 : 0.6, 1.1, "concreto", { material: material("concreto", 1, 1, 0xd8d8d8) }));
+
+  spawnJogador = { x: 0, z: -33, yaw: Math.PI };
+}
+
+// ===== Mapa 4: Vila na Neve =====
+function mapaNeve() {
+  prepararCena(0xcfd8e2, 0xdfe6ee, 22, 85, "neve", 20);
+  cena.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.9));
+  const sol = new THREE.DirectionalLight(0xfff6ea, 0.5);
+  sol.position.set(20, 40, -30);
+  cena.add(sol);
+
+  bordas(4, "madeira");
+
+  // Cabanas com telhado de neve
+  const matTelhado = new THREE.MeshLambertMaterial({ color: 0xf2f6fa });
+  const geoTelhado = new THREE.ConeGeometry(Math.SQRT1_2, 1, 4);
+  geoTelhado.rotateY(Math.PI / 4);
+  const cabana = (x, z, w, d) => {
+    bloco(x, z, w, d, 3.2, "madeira", { escalaTextura: 2 });
+    const telhado = new THREE.Mesh(geoTelhado, matTelhado);
+    telhado.scale.set(w + 0.8, 2.2, d + 0.8);
+    telhado.position.set(x, 3.2 + 1.1, z);
+    cena.add(telhado);
+    solidos.push(telhado);
+    // chaminé
+    bloco(x + w / 4, z, 0.6, 0.6, 1.6, "tijolo", { y0: 3.6, colide: false });
+  };
+  cabana(-20, -18, 8, 6);
+  cabana(20, 18, 8, 6);
+  cabana(-22, 16, 6, 8);
+  cabana(22, -16, 6, 8);
+  cabana(0, 6, 7, 5);
+
+  // Pinheiros
+  const matTronco = new THREE.MeshLambertMaterial({ color: 0x5a3b22 });
+  const matFolha = new THREE.MeshLambertMaterial({ color: 0x2f5a3a });
+  const matNeve = new THREE.MeshLambertMaterial({ color: 0xf4f8fb });
+  const geoTronco = new THREE.CylinderGeometry(0.25, 0.3, 1.6, 7);
+  const geoCopa1 = new THREE.ConeGeometry(1.7, 2.6, 8);
+  const geoCopa2 = new THREE.ConeGeometry(1.25, 2.1, 8);
+  const geoPonta = new THREE.ConeGeometry(0.6, 0.9, 8);
+  const pinheiro = (x, z) => {
+    const partes = [
+      [geoTronco, matTronco, 0.8], [geoCopa1, matFolha, 2.6], [geoCopa2, matFolha, 3.9], [geoPonta, matNeve, 4.9]
+    ];
+    partes.forEach(([geo, mat, y]) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, y, z);
+      cena.add(m);
+      solidos.push(m);
+    });
+    colisores.push({ minX: x - 0.45, maxX: x + 0.45, minZ: z - 0.45, maxZ: z + 0.45 });
+  };
+  [[-8, -22], [9, -24], [-30, -2], [-28, 30], [30, 30], [30, -2], [-12, 28], [12, 26],
+   [-4, 20], [14, 0], [-14, -6], [-30, -30], [30, -30], [6, -12], [-26, 6], [26, 6]].forEach(([x, z]) => pinheiro(x, z));
+
+  // Lago congelado (só visual)
+  const lago = new THREE.Mesh(new THREE.CircleGeometry(5, 20), new THREE.MeshLambertMaterial({ color: 0xbfe0f0 }));
+  lago.rotation.x = -Math.PI / 2;
+  lago.scale.set(1.4, 1, 1);
+  lago.position.set(-6, 0.02, -6);
+  cena.add(lago);
+
+  // Pilhas de lenha e pedras
+  [[6, -4, true], [-12, 10, false], [16, -26, true], [-18, -30, false]].forEach(([x, z, deitada]) =>
+    bloco(x, z, deitada ? 3 : 1.2, deitada ? 1.2 : 3, 0.9, "madeira", { escalaTextura: 1.5 }));
+  const matPedra = new THREE.MeshLambertMaterial({ color: 0x8a9096 });
+  [[10, 12, 1.1], [-20, 2, 0.9], [2, 28, 1.2], [24, -6, 0.8], [-2, -18, 1]].forEach(([x, z, r]) => {
+    const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), matPedra);
+    m.position.set(x, r * 0.6, z);
+    m.rotation.set(Math.random(), Math.random(), 0);
+    cena.add(m);
+    solidos.push(m);
+    colisores.push({ minX: x - r * 0.8, maxX: x + r * 0.8, minZ: z - r * 0.8, maxZ: z + r * 0.8 });
+  });
+  [[-3, -28], [4, -28]].forEach(([x, z]) => caixaMadeira(x, z, 1.5));
+  [[-17, -14], [17, 14], [8, -4.5]].forEach(([x, z]) => barril(x, z));
+
+  spawnJogador = { x: 0, z: -32, yaw: Math.PI };
+}
+
+// ===== Mapa 5: Base Militar =====
+function mapaBase() {
+  prepararCena(0xa9c4d8, 0xc6ccb8, 30, 110, "terra", 20);
+  cena.add(new THREE.HemisphereLight(0xf4f8ff, 0x6b6a45, 0.85));
+  const sol = new THREE.DirectionalLight(0xfff2dc, 0.6);
+  sol.position.set(25, 50, 15);
+  cena.add(sol);
+
+  bordas(4, "paredeArmazem");
+
+  // Bunkers de concreto com fresta escura
+  const matFresta = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  [[-22, -18, 10, 7], [22, 18, 10, 7]].forEach(([x, z, w, d]) => {
+    bloco(x, z, w, d, 3.2, "concreto", { material: material("concreto", 3, 1, 0xb5b5ad) });
+    const fresta = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, 0.25, d + 0.02), matFresta);
+    fresta.position.set(x, 2.3, z);
+    cena.add(fresta);
+  });
+
+  // Heliponto no centro (só visual)
+  const heli = new THREE.Mesh(new THREE.CircleGeometry(6, 28), new THREE.MeshLambertMaterial({ color: 0x3e4044 }));
+  heli.rotation.x = -Math.PI / 2;
+  heli.position.y = 0.02;
+  cena.add(heli);
+  const matH = new THREE.MeshBasicMaterial({ color: 0xf0f0e8 });
+  [[-1.2, 0, 0.5, 4], [1.2, 0, 0.5, 4], [0, 0, 2, 0.5]].forEach(([x, z, w, d]) => {
+    const h = new THREE.Mesh(new THREE.PlaneGeometry(w, d), matH);
+    h.rotation.x = -Math.PI / 2;
+    h.position.set(x, 0.03, z);
+    cena.add(h);
+  });
+
+  // Muros de sacos de areia (cobertura baixa: agache atrás deles)
+  [[-8, -8, 6, 1], [8, 8, 6, 1], [-8, 8, 1, 6], [8, -8, 1, 6], [0, -20, 8, 1], [0, 20, 8, 1],
+   [-30, 0, 1, 8], [30, 0, 1, 8], [-16, 28, 5, 1], [16, -28, 5, 1]].forEach(([x, z, w, d]) =>
+    bloco(x, z, w, d, 1.1, "sacos", { escalaTextura: 1.5 }));
+
+  // Barracas
+  const matLona = new THREE.MeshLambertMaterial({ color: 0x55613a });
+  const geoBarraca = new THREE.CylinderGeometry(1.9, 1.9, 6, 3);
+  [[-22, 6], [22, -6]].forEach(([x, z]) => {
+    const b = new THREE.Mesh(geoBarraca, matLona);
+    b.rotation.x = -Math.PI / 2; // deita o prisma com a ponta para cima
+    b.position.set(x, 0.95, z);
+    cena.add(b);
+    solidos.push(b);
+    colisores.push({ minX: x - 1.7, maxX: x + 1.7, minZ: z - 3, maxZ: z + 3, maxY: 2.8 });
+  });
+
+  // Caminhões
+  const matCaminhao = new THREE.MeshLambertMaterial({ color: 0x4b5a32 });
+  const matLonaCaminhao = new THREE.MeshLambertMaterial({ color: 0x6a6a4a });
+  const caminhao = (x, z, deitado) => {
+    const w = deitado ? 6 : 2.4, d = deitado ? 2.4 : 6;
+    bloco(x, z, w, d, 1.2, null, { material: matCaminhao, y0: 0.5 });
+    const cx = deitado ? x + 2.1 : x, cz = deitado ? z : z + 2.1;
+    bloco(cx, cz, deitado ? 1.8 : 2.3, deitado ? 2.3 : 1.8, 1.2, null, { material: matCaminhao, y0: 1.7, colide: false });
+    bloco(deitado ? x - 0.9 : x, deitado ? z : z - 0.9, deitado ? 4 : 2.3, deitado ? 2.3 : 4, 1.5, null, { material: matLonaCaminhao, y0: 1.7, colide: false });
+  };
+  caminhao(-14, 24, true);
+  caminhao(14, -24, true);
+  caminhao(27, 6, false);
+
+  // Torres de vigia
+  const torre = (x, z) => {
+    [[-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]].forEach(([dx, dz]) =>
+      bloco(x + dx, z + dz, 0.25, 0.25, 4.5, "madeira", { escalaTextura: 1 }));
+    bloco(x, z, 3.2, 3.2, 0.3, "madeira", { y0: 4.5, colide: false });
+    bloco(x, z - 1.5, 3.2, 0.15, 1, "madeira", { y0: 4.8, colide: false });
+    bloco(x, z + 1.5, 3.2, 0.15, 1, "madeira", { y0: 4.8, colide: false });
+    const telhado = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.4, 4), matLona);
+    telhado.rotation.y = Math.PI / 4;
+    telhado.position.set(x, 6.7, z);
+    cena.add(telhado);
+  };
+  torre(-30, 30);
+  torre(30, -30);
+
+  // Depósito de combustível: barris explosivos!
+  [[18, 8], [19, 9.2], [17.6, 9.8], [-18, -8], [-19.2, -8.6], [4, -28], [-4, 28], [-28, -20], [10, 14]].forEach(([x, z]) => barril(x, z));
+
+  // Caixas
+  [[-6, -26, 1.5], [6, 26, 1.5], [-26, -28, 2], [26, 28, 2], [12, 0, 1.5], [-12, 0, 1.5]].forEach(([x, z, t]) => caixaMadeira(x, z, t));
+  caixaMadeira(-26, -28, 1.4, 2);
+
+  spawnJogador = { x: 0, z: -32, yaw: Math.PI };
+}
+
+// ===== Mapa 6: Porto (pôr do sol, cais, navio e guindastes) =====
+function mapaPorto() {
+  prepararCena(0xf0a070, 0xe8a27a, 30, 110, "concreto", 20);
+  cena.add(new THREE.HemisphereLight(0xffd6b0, 0x5a4a5a, 0.85));
+  const sol = new THREE.DirectionalLight(0xffb070, 0.7);
+  sol.position.set(-40, 25, 40);
+  cena.add(sol);
+
+  // Muros só em 3 lados: no fundo o mar vai até o horizonte
+  bloco(0, -37, 76, 2, 4, "paredeArmazem");
+  bloco(-37, 0, 2, 76, 4, "paredeArmazem");
+  bloco(37, 0, 2, 76, 4, "paredeArmazem");
+  colisores.push({ minX: -40, maxX: 40, minZ: 36, maxZ: 60, maxY: 0.5 }); // fim dos píeres
+
+  // Mar no fundo do mapa (não dá para andar na água)
+  const agua = new THREE.Mesh(new THREE.PlaneGeometry(300, 80), new THREE.MeshLambertMaterial({ color: 0x2a6f9a }));
+  agua.rotation.x = -Math.PI / 2;
+  agua.position.set(0, 0.03, 63.8);
+  cena.add(agua);
+  const borda = new THREE.Mesh(new THREE.BoxGeometry(74, 0.3, 0.4), new THREE.MeshLambertMaterial({ color: 0xd9c25a }));
+  borda.position.set(0, 0.15, 23.6);
+  cena.add(borda);
+  // áreas de água bloqueadas (os píeres ficam livres)
+  [[-36, -20], [-14, 6], [12, 36]].forEach(([x1, x2]) =>
+    colisores.push({ minX: x1, maxX: x2, minZ: 23.8, maxZ: 36, maxY: 0.5 }));
+
+  // Píeres de madeira entrando no mar
+  const matPier = material("madeira", 2, 6, 0xc08a5a);
+  [[-17, 6], [9, 6]].forEach(([x, w]) => {
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(w, 0.2, 12), matPier);
+    pier.position.set(x, 0.08, 30);
+    cena.add(pier);
+  });
+
+  // Navio atracado
+  const matCasco = new THREE.MeshLambertMaterial({ color: 0x8a2a24 });
+  const matConvés = new THREE.MeshLambertMaterial({ color: 0xe8e2d0 });
+  bloco(26, 30, 14, 7, 3.2, null, { material: matCasco, colide: false });
+  bloco(30, 30, 5, 5, 3, null, { material: matConvés, y0: 3.2, colide: false });
+  bloco(30, 30, 1, 1, 2.5, null, { material: matCasco, y0: 6.2, colide: false });
+
+  // Guindastes de contêiner (pernas sólidas, viga lá em cima)
+  const matGuindaste = new THREE.MeshLambertMaterial({ color: 0xf2c230 });
+  const guindaste = (x, z) => {
+    [[-3, -2.5], [3, -2.5], [-3, 2.5], [3, 2.5]].forEach(([dx, dz]) =>
+      bloco(x + dx, z + dz, 0.6, 0.6, 12, null, { material: matGuindaste }));
+    bloco(x, z, 7, 6, 0.8, null, { material: matGuindaste, y0: 12, colide: false });
+    bloco(x, z + 6, 1.2, 14, 0.7, null, { material: matGuindaste, y0: 12.2, colide: false }); // braço sobre o mar
+    bloco(x, z - 1, 2.4, 2, 1.6, null, { material: new THREE.MeshLambertMaterial({ color: 0x333333 }), y0: 12.8, colide: false });
+  };
+  guindaste(-17, 18);
+  guindaste(9, 18);
+
+  // Pilhas de contêineres
+  const cores = [0xb8452f, 0x2f5d8a, 0x3f7a45, 0xc7832b, 0x7a3f8a, 0x2a8a8a];
+  let i = 0;
+  [[-26, 4, true], [-26, -6, false], [-8, 6, true], [-8, -4, false], [8, -2, true], [20, 6, false], [24, -8, true], [-2, -16, true]].forEach(([x, z, empilhado]) => {
+    bloco(x, z, 2.6, 6, 2.6, "container", { cor: cores[i++ % cores.length], escalaTextura: 1.5 });
+    if (empilhado) bloco(x, z, 2.6, 6, 2.6, "container", { cor: cores[(i + 3) % cores.length], escalaTextura: 1.5, y0: 2.6 });
+  });
+  // contêineres deitados (de lado)
+  bloco(14, 12, 6, 2.6, 2.6, "container", { cor: 0x2f5d8a, escalaTextura: 1.5 });
+  bloco(-30, 14, 6, 2.6, 2.6, "container", { cor: 0xc7832b, escalaTextura: 1.5 });
+
+  // Galpão do porto
+  bloco(-24, -26, 14, 8, 6, "paredeArmazem");
+  bloco(24, -26, 10, 8, 5, "tijolo");
+
+  // Cabeços de amarração na beira do cais
+  const matCabeco = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+  [-30, -24, -4, 0, 18, 30].forEach(x => {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.7, 10), matCabeco);
+    c.position.set(x, 0.35, 22.8);
+    cena.add(c);
+    solidos.push(c);
+    colisores.push({ minX: x - 0.35, maxX: x + 0.35, minZ: 22.45, maxZ: 23.15, maxY: 0.7 });
+  });
+
+  // Caixas e barris explosivos
+  [[-14, -10, 1.5], [4, 8, 1.5], [16, -14, 2], [-30, -14, 2], [0, -28, 1.5], [2, 19, 1.5]].forEach(([x, z, t]) => caixaMadeira(x, z, t));
+  caixaMadeira(16, -14, 1.4, 2);
+  [[-12, 14], [-11, 15.2], [26, 16], [2, -10], [-20, -16], [30, -16]].forEach(([x, z]) => barril(x, z));
+
+  spawnJogador = { x: 0, z: -32, yaw: Math.PI };
+}
+
+const MAPAS = { deserto: mapaDeserto, armazem: mapaArmazem, cidade: mapaCidade, neve: mapaNeve, base: mapaBase, porto: mapaPorto };
+
+// Gera pontos livres espalhados pelo mapa para os bots andarem
+function gerarPontosRota() {
+  pontosRota = [];
+  let tentativas = 0;
+  while (pontosRota.length < 80 && tentativas < 3000) {
+    tentativas++;
+    const p = new THREE.Vector3((Math.random() - 0.5) * 68, 0, (Math.random() - 0.5) * 68);
+    if (!pontoLivre(p.x, p.z, 1.2)) continue;
+    pontosRota.push(p);
+  }
+}
+
+function pontoLivre(x, z, folga) {
+  return colisores.every(c => x < c.minX - folga || x > c.maxX + folga || z < c.minZ - folga || z > c.maxZ + folga);
+}
+
+// ===== Colisão: empurra um círculo para fora dos retângulos =====
+function moverComColisao(pos, dx, dz, raio) {
+  pos.x += dx;
+  resolverColisao(pos, raio);
+  pos.z += dz;
+  resolverColisao(pos, raio);
+}
+
+function resolverColisao(pos, raio) {
+  for (const c of colisores) {
+    const px = Math.max(c.minX, Math.min(pos.x, c.maxX));
+    const pz = Math.max(c.minZ, Math.min(pos.z, c.maxZ));
+    const dx = pos.x - px, dz = pos.z - pz;
+    const d2 = dx * dx + dz * dz;
+    if (d2 >= raio * raio) continue;
+    if (d2 > 0.000001) {
+      const d = Math.sqrt(d2);
+      pos.x += (dx / d) * (raio - d);
+      pos.z += (dz / d) * (raio - d);
+    } else {
+      // centro dentro da caixa: sai pelo lado mais próximo
+      const saidas = [pos.x - c.minX, c.maxX - pos.x, pos.z - c.minZ, c.maxZ - pos.z];
+      const menor = Math.min(...saidas);
+      if (menor === saidas[0]) pos.x = c.minX - raio;
+      else if (menor === saidas[1]) pos.x = c.maxX + raio;
+      else if (menor === saidas[2]) pos.z = c.minZ - raio;
+      else pos.z = c.maxZ + raio;
+    }
+  }
+}
+
+// ===== Modelos das armas (feitos de blocos) =====
+const MAT = {
+  metal: new THREE.MeshLambertMaterial({ color: 0x2b2d30 }),
+  metalClaro: new THREE.MeshLambertMaterial({ color: 0x4a4e54 }),
+  madeira: new THREE.MeshLambertMaterial({ color: 0x7a4a24 }),
+  verde: new THREE.MeshLambertMaterial({ color: 0x4a5a32 }),
+  pele: new THREE.MeshLambertMaterial({ color: 0xd9a27a }),
+  manga: new THREE.MeshLambertMaterial({ color: 0x3d4a2f }),
+  luva: new THREE.MeshLambertMaterial({ color: 0x1e1e1e }),
+  areia: new THREE.MeshLambertMaterial({ color: 0xa38b5c })
+};
+
+function peca(grupo, w, h, d, mat, x, y, z, rx = 0, ry = 0) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  m.rotation.set(rx, ry, 0);
+  grupo.add(m);
+  return m;
+}
+
+function cano(grupo, raio, comprimento, mat, x, y, z) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(raio, raio, comprimento, 10), mat);
+  m.rotation.x = Math.PI / 2;
+  m.position.set(x, y, z);
+  grupo.add(m);
+  return m;
+}
+
+// Mão direita segurando o cabo + braço
+function maoDireita(g, x, y, z) {
+  peca(g, 0.075, 0.085, 0.1, MAT.luva, x, y, z);
+  peca(g, 0.09, 0.09, 0.45, MAT.manga, x + 0.03, y - 0.1, z + 0.24, 0.4, 0.05);
+}
+
+// Mão esquerda apoiando a frente da arma + braço vindo da esquerda
+function maoEsquerda(g, x, y, z) {
+  peca(g, 0.085, 0.06, 0.11, MAT.luva, x, y, z);
+  peca(g, 0.09, 0.09, 0.5, MAT.manga, x - 0.17, y - 0.1, z + 0.16, 0.3, -0.75);
+}
+
+function criarModeloArma(tipo) {
+  const g = new THREE.Group();
+  const boca = new THREE.Object3D();
+  g.add(boca);
+
+  if (tipo === "pistola" || tipo === "pistolaAuto") {
+    if (tipo === "pistolaAuto") peca(g, 0.04, 0.1, 0.05, MAT.metal, 0, -0.2, 0.06, 0.25); // pente estendido
+    peca(g, 0.05, 0.055, 0.22, MAT.metalClaro, 0, 0, -0.06);
+    peca(g, 0.045, 0.035, 0.18, MAT.metal, 0, -0.04, -0.05);
+    peca(g, 0.045, 0.12, 0.06, MAT.metal, 0, -0.1, 0.04, 0.25);
+    peca(g, 0.012, 0.015, 0.01, MAT.metal, 0, 0.034, -0.16);
+    maoDireita(g, 0, -0.1, 0.05);
+    maoEsquerda(g, -0.03, -0.11, 0.03);
+    boca.position.set(0, 0, -0.19);
+  } else if (tipo === "fuzil") {
+    peca(g, 0.06, 0.09, 0.4, MAT.metal, 0, 0, 0);
+    peca(g, 0.066, 0.07, 0.22, MAT.madeira, 0, -0.005, -0.3);
+    cano(g, 0.012, 0.25, MAT.metal, 0, 0.015, -0.52);
+    peca(g, 0.01, 0.045, 0.01, MAT.metal, 0, 0.05, -0.6);
+    peca(g, 0.045, 0.17, 0.07, MAT.metal, 0, -0.12, -0.08, -0.3);
+    peca(g, 0.04, 0.1, 0.05, MAT.madeira, 0, -0.09, 0.11, 0.3);
+    peca(g, 0.05, 0.085, 0.28, MAT.madeira, 0, -0.03, 0.33);
+    maoDireita(g, 0, -0.1, 0.12);
+    maoEsquerda(g, 0, -0.06, -0.3);
+    boca.position.set(0, 0.015, -0.66);
+  } else if (tipo === "sniper" || tipo === "scout" || tipo === "sniperSemi" || tipo === "antimaterial") {
+    const corpo = { sniper: MAT.verde, scout: MAT.metal, sniperSemi: MAT.areia, antimaterial: MAT.metalClaro }[tipo];
+    if (tipo === "antimaterial") {
+      cano(g, 0.024, 0.12, MAT.metal, 0, 0.01, -0.8);              // freio de boca grosso
+      peca(g, 0.012, 0.09, 0.012, MAT.metal, -0.03, -0.06, -0.55, 0.3); // bipé
+      peca(g, 0.012, 0.09, 0.012, MAT.metal, 0.03, -0.06, -0.55, 0.3);
+    }
+    peca(g, 0.06, 0.08, 0.45, corpo, 0, 0, 0);
+    cano(g, 0.014, tipo === "scout" ? 0.45 : 0.55, MAT.metal, 0, 0.01, tipo === "scout" ? -0.45 : -0.5);
+    cano(g, tipo === "scout" ? 0.017 : 0.022, 0.26, MAT.metal, 0, 0.08, -0.04);
+    peca(g, 0.02, 0.04, 0.02, MAT.metal, 0, 0.055, -0.1);
+    peca(g, 0.02, 0.04, 0.02, MAT.metal, 0, 0.055, 0.06);
+    peca(g, 0.04, tipo === "sniperSemi" ? 0.14 : 0.07, 0.06, MAT.metal, 0, tipo === "sniperSemi" ? -0.1 : -0.07, -0.05);
+    peca(g, 0.04, 0.1, 0.05, corpo, 0, -0.09, 0.12, 0.3);
+    peca(g, 0.06, 0.11, 0.32, corpo, 0, -0.03, 0.37);
+    peca(g, 0.03, 0.02, 0.05, MAT.metalClaro, 0.04, 0.02, 0.05);
+    maoDireita(g, 0, -0.1, 0.13);
+    maoEsquerda(g, 0, -0.05, -0.22);
+    boca.position.set(0, 0.01, tipo === "antimaterial" ? -0.87 : -0.79);
+  } else if (tipo === "escopeta" || tipo === "escopetaAuto" || tipo === "escopetaTatica") {
+    const acabamento = tipo === "escopeta" ? MAT.madeira : MAT.metal;
+    if (tipo === "escopetaTatica") {
+      peca(g, 0.05, 0.12, 0.08, MAT.metal, 0, -0.1, -0.06, -0.15);  // pente em caixa
+      peca(g, 0.02, 0.035, 0.08, MAT.metalClaro, 0, 0.065, -0.02);  // mira holográfica
+    }
+    cano(g, 0.02, 0.6, MAT.metal, 0, 0.02, -0.35);
+    cano(g, 0.017, 0.45, MAT.metalClaro, 0, -0.025, -0.3);
+    peca(g, 0.06, 0.06, 0.18, acabamento, 0, -0.03, -0.32);
+    peca(g, 0.06, 0.08, 0.22, MAT.metal, 0, 0, 0.02);
+    peca(g, 0.04, 0.1, 0.05, acabamento, 0, -0.08, 0.14, 0.3);
+    peca(g, 0.055, 0.09, 0.3, acabamento, 0, -0.04, 0.29);
+    if (tipo === "escopetaAuto") peca(g, 0.01, 0.03, 0.12, MAT.metalClaro, 0, 0.055, 0);
+    maoDireita(g, 0, -0.1, 0.15);
+    maoEsquerda(g, 0, -0.07, -0.32);
+    boca.position.set(0, 0.02, -0.66);
+  } else if (tipo === "revolver") {
+    cano(g, 0.012, 0.14, MAT.metalClaro, 0, 0.01, -0.17);
+    cano(g, 0.032, 0.065, MAT.metalClaro, 0, -0.005, -0.06);
+    peca(g, 0.04, 0.05, 0.13, MAT.metal, 0, 0.005, -0.05);
+    peca(g, 0.042, 0.11, 0.05, MAT.madeira, 0, -0.08, 0.03, 0.35);
+    peca(g, 0.012, 0.025, 0.02, MAT.metal, 0, 0.035, 0.01);
+    maoDireita(g, 0, -0.09, 0.04);
+    maoEsquerda(g, -0.03, -0.1, 0.03);
+    boca.position.set(0, 0.01, -0.25);
+  } else if (tipo === "pistolaPesada") {
+    peca(g, 0.06, 0.07, 0.28, MAT.metalClaro, 0, 0, -0.08);
+    peca(g, 0.055, 0.04, 0.22, MAT.metal, 0, -0.05, -0.06);
+    peca(g, 0.05, 0.13, 0.065, MAT.metal, 0, -0.11, 0.04, 0.25);
+    peca(g, 0.014, 0.02, 0.012, MAT.metal, 0, 0.044, -0.2);
+    maoDireita(g, 0, -0.11, 0.05);
+    maoEsquerda(g, -0.03, -0.12, 0.03);
+    boca.position.set(0, 0, -0.23);
+  } else if (tipo === "m4") {
+    peca(g, 0.055, 0.09, 0.38, MAT.metal, 0, 0, 0);
+    peca(g, 0.065, 0.07, 0.24, MAT.metalClaro, 0, -0.005, -0.3);
+    cano(g, 0.011, 0.22, MAT.metal, 0, 0.015, -0.52);
+    peca(g, 0.02, 0.035, 0.14, MAT.metal, 0, 0.065, -0.02);
+    peca(g, 0.01, 0.05, 0.01, MAT.metal, 0, 0.05, -0.4);
+    peca(g, 0.04, 0.15, 0.06, MAT.metal, 0, -0.12, -0.06, -0.1);
+    peca(g, 0.04, 0.1, 0.05, MAT.metal, 0, -0.09, 0.11, 0.3);
+    peca(g, 0.045, 0.07, 0.24, MAT.metal, 0, -0.025, 0.3);
+    maoDireita(g, 0, -0.1, 0.12);
+    maoEsquerda(g, 0, -0.06, -0.3);
+    boca.position.set(0, 0.015, -0.64);
+  } else if (tipo === "smgTatica") {
+    peca(g, 0.055, 0.085, 0.34, MAT.metal, 0, 0, -0.03);
+    peca(g, 0.062, 0.065, 0.16, MAT.metalClaro, 0, -0.005, -0.25);
+    cano(g, 0.01, 0.1, MAT.metal, 0, 0.012, -0.37);
+    peca(g, 0.035, 0.15, 0.05, MAT.metal, 0, -0.12, -0.08, -0.25);
+    peca(g, 0.04, 0.1, 0.05, MAT.metal, 0, -0.09, 0.09, 0.3);
+    peca(g, 0.045, 0.07, 0.2, MAT.metal, 0, -0.02, 0.24);
+    peca(g, 0.012, 0.04, 0.012, MAT.metal, 0, 0.06, -0.3);
+    maoDireita(g, 0, -0.1, 0.1);
+    maoEsquerda(g, 0, -0.06, -0.25);
+    boca.position.set(0, 0.012, -0.43);
+  } else if (tipo === "smgSilenciada") {
+    peca(g, 0.055, 0.08, 0.3, MAT.metal, 0, 0, -0.02);
+    cano(g, 0.024, 0.28, MAT.metalClaro, 0, 0.01, -0.3); // silenciador
+    peca(g, 0.035, 0.18, 0.05, MAT.metal, 0, -0.13, -0.08);
+    peca(g, 0.04, 0.1, 0.05, MAT.metal, 0, -0.09, 0.08, 0.3);
+    peca(g, 0.045, 0.07, 0.2, MAT.metal, 0, -0.02, 0.22);
+    maoDireita(g, 0, -0.1, 0.09);
+    maoEsquerda(g, 0, -0.15, -0.08);
+    boca.position.set(0, 0.01, -0.45);
+  } else if (tipo === "smgP90") {
+    peca(g, 0.07, 0.11, 0.42, MAT.areia, 0, -0.01, 0.02);
+    peca(g, 0.06, 0.03, 0.3, MAT.metal, 0, 0.06, 0); // pente em cima
+    cano(g, 0.011, 0.08, MAT.metal, 0, 0.01, -0.22);
+    peca(g, 0.05, 0.06, 0.07, MAT.metal, 0, -0.08, -0.08);
+    peca(g, 0.02, 0.04, 0.08, MAT.metal, 0, 0.09, -0.12);
+    maoDireita(g, 0, -0.1, 0.06);
+    maoEsquerda(g, -0.01, -0.09, -0.12);
+    boca.position.set(0, 0.01, -0.27);
+  } else if (tipo === "fal") {
+    peca(g, 0.06, 0.095, 0.42, MAT.metal, 0, 0, 0);
+    peca(g, 0.066, 0.075, 0.24, MAT.madeira, 0, -0.005, -0.32);
+    cano(g, 0.012, 0.3, MAT.metal, 0, 0.015, -0.58);
+    peca(g, 0.012, 0.05, 0.012, MAT.metal, 0, 0.055, -0.66);
+    peca(g, 0.045, 0.13, 0.07, MAT.metal, 0, -0.11, -0.08, -0.1);
+    peca(g, 0.04, 0.1, 0.05, MAT.madeira, 0, -0.09, 0.12, 0.3);
+    peca(g, 0.05, 0.09, 0.3, MAT.madeira, 0, -0.03, 0.35);
+    maoDireita(g, 0, -0.1, 0.13);
+    maoEsquerda(g, 0, -0.06, -0.32);
+    boca.position.set(0, 0.015, -0.74);
+  } else if (tipo === "smg") {
+    peca(g, 0.055, 0.08, 0.3, MAT.metal, 0, 0, -0.02);
+    cano(g, 0.011, 0.12, MAT.metal, 0, 0.01, -0.23);
+    peca(g, 0.035, 0.2, 0.05, MAT.metal, 0, -0.14, -0.1);
+    peca(g, 0.04, 0.1, 0.05, MAT.metal, 0, -0.09, 0.08, 0.3);
+    peca(g, 0.015, 0.015, 0.2, MAT.metalClaro, 0, -0.02, 0.22);
+    peca(g, 0.02, 0.05, 0.015, MAT.metalClaro, 0, -0.03, 0.32);
+    maoDireita(g, 0, -0.1, 0.09);
+    maoEsquerda(g, 0, -0.17, -0.1);
+    boca.position.set(0, 0.01, -0.3);
+  } else if (tipo === "canoDuplo") {
+    cano(g, 0.018, 0.55, MAT.metal, -0.019, 0.02, -0.33);
+    cano(g, 0.018, 0.55, MAT.metal, 0.019, 0.02, -0.33);
+    peca(g, 0.06, 0.045, 0.22, MAT.madeira, 0, -0.02, -0.25);
+    peca(g, 0.065, 0.07, 0.12, MAT.metalClaro, 0, 0.005, 0.0);
+    peca(g, 0.05, 0.09, 0.32, MAT.madeira, 0, -0.04, 0.2, 0.15);
+    maoDireita(g, 0, -0.1, 0.12);
+    maoEsquerda(g, 0, -0.06, -0.25);
+    boca.position.set(0, 0.02, -0.62);
+  } else if (tipo === "bullpup") {
+    peca(g, 0.065, 0.11, 0.55, MAT.verde, 0, -0.01, 0.02);
+    cano(g, 0.011, 0.14, MAT.metal, 0, 0.01, -0.32);
+    cano(g, 0.02, 0.16, MAT.metal, 0, 0.085, -0.08);                // luneta curta
+    peca(g, 0.04, 0.14, 0.06, MAT.metal, 0, -0.1, 0.16, -0.1);      // pente atrás do cabo
+    peca(g, 0.04, 0.1, 0.05, MAT.verde, 0, -0.1, -0.06, 0.3);       // cabo
+    maoDireita(g, 0, -0.11, -0.05);
+    maoEsquerda(g, 0, -0.07, -0.22);
+    boca.position.set(0, 0.01, -0.4);
+  } else if (tipo === "karambit") {
+    const lamina = new THREE.MeshLambertMaterial({ color: 0xc9ced4 });
+    peca(g, 0.01, 0.04, 0.1, lamina, 0, 0.02, -0.1, 0.5);
+    peca(g, 0.01, 0.035, 0.09, lamina, 0, -0.01, -0.17, 1.1);
+    peca(g, 0.03, 0.035, 0.1, MAT.manga, 0, 0, 0.02);
+    cano(g, 0.02, 0.008, MAT.metal, 0, 0, 0.08);                    // argola
+    maoDireita(g, 0, -0.01, 0.03);
+    boca.position.set(0, -0.03, -0.2);
+  } else if (tipo === "machete") {
+    const lamina = new THREE.MeshLambertMaterial({ color: 0xaab0b6 });
+    peca(g, 0.01, 0.07, 0.38, lamina, 0, 0.02, -0.25);
+    peca(g, 0.01, 0.03, 0.06, lamina, 0, 0.045, -0.43, -0.4);
+    peca(g, 0.035, 0.045, 0.13, MAT.madeira, 0, -0.005, 0.02);
+    maoDireita(g, 0, -0.01, 0.04);
+    boca.position.set(0, 0.02, -0.45);
+  } else if (tipo === "baioneta") {
+    const lamina = new THREE.MeshLambertMaterial({ color: 0xc9ced4 });
+    peca(g, 0.01, 0.035, 0.3, lamina, 0, 0.01, -0.2);
+    peca(g, 0.008, 0.015, 0.05, lamina, 0, 0.025, -0.37, -0.4);
+    peca(g, 0.06, 0.02, 0.025, MAT.metal, 0, 0, -0.04);
+    cano(g, 0.018, 0.01, MAT.metal, 0, 0.03, -0.04);                // anel de encaixe
+    peca(g, 0.032, 0.04, 0.12, MAT.verde, 0, -0.005, 0.03);
+    maoDireita(g, 0, -0.01, 0.04);
+    boca.position.set(0, 0.01, -0.37);
+  } else if (tipo === "faca") {
+    const lamina = new THREE.MeshLambertMaterial({ color: 0xc9ced4 });
+    peca(g, 0.012, 0.045, 0.22, lamina, 0, 0.01, -0.16);
+    peca(g, 0.008, 0.02, 0.06, lamina, 0, 0.035, -0.25, -0.5);
+    peca(g, 0.05, 0.02, 0.025, MAT.metal, 0, 0, -0.04);
+    peca(g, 0.032, 0.04, 0.12, MAT.luva, 0, -0.005, 0.03);
+    maoDireita(g, 0, -0.01, 0.04);
+    boca.position.set(0, 0.01, -0.27);
+  }
+
+  // Clarão do tiro
+  const clarao = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: criarTexturaClarao(), color: 0xffd27a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true
+  }));
+  clarao.scale.set(0.22, 0.22, 1);
+  clarao.visible = false;
+  boca.add(clarao);
+
+  g.userData = { boca, clarao };
+  return g;
+}
+
+function criarTexturaClarao() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const ctx = c.getContext("2d");
+  const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(255,255,230,1)");
+  grad.addColorStop(0.3, "rgba(255,200,80,0.9)");
+  grad.addColorStop(1, "rgba(255,120,0,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
+// Posição da arma na tela: normal e mirando
+const POSE = {
+  pistola:  { base: [0.2, -0.19, -0.5],  mira: [0, -0.06, -0.42] },
+  fuzil:    { base: [0.22, -0.21, -0.52], mira: [0, -0.075, -0.42] },
+  sniper:   { base: [0.22, -0.22, -0.6],  mira: [0, -0.12, -0.5] },
+  escopeta: { base: [0.22, -0.21, -0.52], mira: [0, -0.085, -0.42] },
+  faca:     { base: [0.2, -0.16, -0.4],  mira: [0.2, -0.16, -0.4] },
+  smg:      { base: [0.2, -0.2, -0.46],  mira: [0, -0.072, -0.38] }
+};
+
+const modelos = {};
+ORDEM_ARMAS.forEach(id => {
+  modelos[id] = criarModeloArma(ARMAS[id].modelo || id);
+  modelos[id].visible = false;
+  cenaArma.add(modelos[id]);
+});
+
+// Troca o modelo de um tipo de arma (usado no menu e no Arsenal)
+function trocarModelo(tipo, indice) {
+  aplicarVariante(tipo, indice);
+  cenaArma.remove(modelos[tipo]);
+  modelos[tipo] = criarModeloArma(ARMAS[tipo].modelo);
+  modelos[tipo].visible = false;
+  cenaArma.add(modelos[tipo]);
+}
+
+desenharClasses();
+desenharModelos();
+
+function equiparVariante(tipo, indice) {
+  trocarModelo(tipo, indice);
+  estadoArmas[tipo] = { pente: ARMAS[tipo].pente, reserva: ARMAS[tipo].reserva };
+  armaAtual = tipo;
+  trocarArma(tipo, true);
+  trocando = 0.35;
+}
+
+// ===== Bots =====
+const MAT_BOT = {
+  colete: new THREE.MeshLambertMaterial({ color: 0x5a4a32 }),
+  camisa: new THREE.MeshLambertMaterial({ color: 0x8a3a2a }),
+  calca: new THREE.MeshLambertMaterial({ color: 0x3e3a33 }),
+  mascara: new THREE.MeshLambertMaterial({ color: 0x1f1f1f }),
+  pele: new THREE.MeshLambertMaterial({ color: 0xc89070 }),
+  arma: new THREE.MeshLambertMaterial({ color: 0x222222 })
+};
+
+// Tipos de inimigos: cada um luta de um jeito
+const TIPOS_BOT = {
+  soldado:  { nome: "Soldado", vida: 100, velocidade: 1, dano: 1, precisao: 1, cadencia: 1,
+              distancia: [6, 18], visao: 1, escala: 1, camisa: 0x8a3a2a, colete: 0x5a4a32, som: "bot", rastro: 0xffe08a },
+  corredor: { nome: "Corredor", vida: 70, velocidade: 1.55, dano: 0.6, precisao: 0.8, cadencia: 0.5,
+              distancia: [2, 7], visao: 0.9, escala: 0.95, camisa: 0xd08a20, colete: 0x2e2e2e, som: "smg", rastro: 0xffd060 },
+  atirador: { nome: "Atirador", vida: 80, velocidade: 0.8, dano: 2.3, precisao: 1.3, cadencia: 2.8,
+              distancia: [22, 60], visao: 1.6, escala: 1, camisa: 0x4a5a32, colete: 0x36452a, som: "scout", rastro: 0xff5040 },
+  pesado:   { nome: "Pesado", vida: 260, velocidade: 0.62, dano: 0.8, precisao: 0.75, cadencia: 0.45,
+              distancia: [4, 14], visao: 1, escala: 1.18, camisa: 0x3a3d42, colete: 0x1f2226, som: "fuzil", rastro: 0xffb060 }
+};
+
+// Sorteia o tipo de bot. Nas primeiras rodadas (e no Básico) os tipos fortes aparecem menos.
+function sortearTipoBot() {
+  const forte = dif === DIFICULDADES.basico ? Math.max(0, rodada - 1) * 6 : 10 + rodada * 4;
+  const pesos = { soldado: 50, corredor: 20, atirador: Math.min(25, forte), pesado: Math.min(25, forte) };
+  let r = Math.random() * Object.values(pesos).reduce((a, b) => a + b, 0);
+  for (const [tipo, peso] of Object.entries(pesos)) { r -= peso; if (r <= 0) return tipo; }
+  return "soldado";
+}
+
+const cacheMatBot = {};
+function matBot(cor) {
+  if (!cacheMatBot[cor]) cacheMatBot[cor] = new THREE.MeshLambertMaterial({ color: cor });
+  return cacheMatBot[cor];
+}
+
+function criarBot(pos, nome, tipoId = "soldado") {
+  const tipo = TIPOS_BOT[tipoId];
+  const g = new THREE.Group();
+  g.position.copy(pos);
+  const partes = [];
+  const parte = (w, h, d, mat, x, y, z, pai = g, cabeca = false) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z);
+    pai.add(m);
+    m.userData.cabeca = cabeca;
+    partes.push(m);
+    return m;
+  };
+
+  const camisa = matBot(tipo.camisa), colete = matBot(tipo.colete);
+  parte(0.56, 0.72, 0.32, camisa, 0, 1.2, 0);
+  parte(0.6, 0.45, 0.36, colete, 0, 1.28, 0);
+  parte(0.3, 0.3, 0.3, MAT_BOT.mascara, 0, 1.73, 0, g, true);
+  parte(0.31, 0.07, 0.31, MAT_BOT.pele, 0, 1.76, 0.001, g, true);
+  if (tipoId === "pesado") {
+    parte(0.36, 0.14, 0.36, colete, 0, 1.92, 0, g, true);       // capacete
+    parte(0.7, 0.3, 0.42, colete, 0, 1.45, 0);                  // armadura dos ombros
+  } else if (tipoId === "corredor") {
+    parte(0.32, 0.06, 0.42, camisa, 0, 1.9, 0.05, g, true);     // boné
+  } else if (tipoId === "atirador") {
+    parte(0.4, 0.12, 0.4, camisa, 0, 1.92, 0, g, true);         // capuz camuflado
+  }
+
+  const pernas = [-0.14, 0.14].map(x => {
+    const pivo = new THREE.Group();
+    pivo.position.set(x, 0.85, 0);
+    g.add(pivo);
+    parte(0.21, 0.85, 0.23, MAT_BOT.calca, 0, -0.42, 0, pivo);
+    return pivo;
+  });
+
+  parte(0.13, 0.13, 0.5, camisa, 0.24, 1.35, 0.2);
+  parte(0.13, 0.13, 0.5, camisa, -0.18, 1.33, 0.25);
+  const comprimentoArma = { soldado: 0.65, corredor: 0.42, atirador: 1.0, pesado: 0.8 }[tipoId];
+  parte(tipoId === "pesado" ? 0.12 : 0.07, 0.11, comprimentoArma, MAT_BOT.arma, 0.06, 1.38, 0.18 + comprimentoArma / 2);
+  const boca = new THREE.Object3D();
+  boca.position.set(0.06, 1.38, 0.2 + comprimentoArma);
+  g.scale.setScalar(tipo.escala);
+  g.add(boca);
+
+  cena.add(g);
+
+  const bot = {
+    grupo: g, partes, pernas, boca, nome: `${nome} [${tipo.nome}]`, tipo,
+    vida: tipo.vida, morto: false, tempoMorto: 0,
+    alvo: null, ultimaPosVista: null, alerta: 0,
+    visivel: false, tempoVisao: 0, reacao: 0, cooldown: 0,
+    passo: Math.random() * 10, desvio: Math.random() > 0.5 ? 1 : -1, tempoDesvio: 0,
+    travado: 0, posAnterior: pos.clone(),
+    tempoReacao: sortear(dif.reacao) / (1 + (rodada - 1) * dif.crescimento)
+  };
+  partes.forEach(p => p.userData.bot = bot);
+  bots.push(bot);
+  return bot;
+}
+
+// ===== Jogador =====
+const jogador = {
+  pos: new THREE.Vector3(), vy: 0, noChao: true,
+  correndo: false, agachado: false, altura: 1.65,
+  yaw: 0, pitch: 0, vida: 100, abates: 0, headshots: 0
+};
+let estadoArmas = {};
+let armaAtual = "fuzil";
+let rodada = 1;
+let estado = "menu"; // menu | jogando | pausado | fim
+let mirando = false, atirando = false, recarregando = 0, trocando = 0;
+let ultimoTiro = 0, spray = 0, coiceVisual = 0, balanco = 0;
+let teclas = {};
+let tempoDano = 0;
+let granadas = 3, listaGranadas = [], ultimaGranada = 0, tremor = 0;
+let distPasso = 0;
+
+function recarregarMunicaoCheia() {
+  estadoArmas = {};
+  ORDEM_ARMAS.forEach(id => estadoArmas[id] = { pente: ARMAS[id].pente, reserva: ARMAS[id].reserva });
+}
+
+// ===== Iniciar partida / rodada =====
+function iniciarRodada(novaPartida) {
+  if (novaPartida) {
+    rodada = 1;
+    jogador.abates = 0;
+    jogador.headshots = 0;
+    armaAtual = armaEscolhida;
+    dif = DIFICULDADES[dificuldadeEscolhida];
+  }
+  document.getElementById("nomeDificuldade").textContent = dif.nome;
+  MAPAS[mapaEscolhido]();
+  gerarPontosRota();
+
+  jogador.pos.set(spawnJogador.x, 0, spawnJogador.z);
+  jogador.yaw = spawnJogador.yaw;
+  jogador.pitch = 0;
+  jogador.vy = 0;
+  jogador.vida = 100;
+  recarregarMunicaoCheia();
+  recarregando = 0; trocando = 0; spray = 0; mirando = false; atirando = false;
+  granadas = 3; listaGranadas = []; tremor = 0;
+
+  // Bots nascem longe do jogador
+  const qtd = Math.min(dif.botsInicio + rodada - 1, dif.botsMax);
+  const longe = pontosRota.filter(p => p.distanceTo(jogador.pos) > 38);
+  const nomes = [...NOMES_BOTS].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < qtd; i++) {
+    const p = longe[Math.floor(Math.random() * longe.length)] || pontosRota[i];
+    criarBot(p.clone(), nomes[i % nomes.length], i === 0 ? "soldado" : sortearTipoBot());
+  }
+
+  trocarArma(armaAtual, true);
+  document.getElementById("feed").innerHTML = "";
+  document.getElementById("rodada").textContent = rodada;
+  mostrarAviso(`RODADA ${rodada} — ELIMINE ${qtd} INIMIGOS`, 2500);
+  atualizarHUD();
+
+  estado = "jogando";
+  mostrarTela(null);
+  document.getElementById("hud").classList.remove("escondido");
+  travarMouse();
+}
+
+function travarMouse() {
+  const r = renderer.domElement.requestPointerLock();
+  if (r && r.catch) r.catch(() => {});
+}
+
+function mostrarTela(id) {
+  ["menu", "pausa", "fim", "arsenal"].forEach(t => document.getElementById(t).classList.toggle("escondida", t !== id));
+}
+
+function pausar() {
+  if (estado !== "jogando") return;
+  estado = "pausado";
+  atirando = false;
+  mostrarTela("pausa");
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+function continuar() {
+  estado = "jogando";
+  mostrarTela(null);
+  travarMouse();
+}
+
+function irParaMenu() {
+  estado = "menu";
+  document.getElementById("hud").classList.add("escondido");
+  mostrarTela("menu");
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+function fimDeRodada(venceu) {
+  estado = "fim";
+  // guarda a maior rodada vencida (aparece no painel de recordes do Fliperama)
+  if (venceu) {
+    try {
+      if (rodada > (Number(localStorage.getItem("zonaRecordeRodada")) || 0)) localStorage.setItem("zonaRecordeRodada", rodada);
+    } catch (e) {}
+  }
+  atirando = false;
+  mirando = false;
+  if (document.pointerLockElement) document.exitPointerLock();
+  const titulo = document.getElementById("tituloFim");
+  titulo.textContent = venceu ? "RODADA VENCIDA!" : "VOCÊ FOI ABATIDO";
+  titulo.className = "titulo-fim " + (venceu ? "vitoria" : "derrota");
+  document.getElementById("textoFim").innerHTML =
+    `Rodada ${rodada}<br>Abates: ${jogador.abates} &nbsp;·&nbsp; Tiros na cabeça: ${jogador.headshots}`;
+  document.getElementById("botaoProxima").textContent = venceu ? "PRÓXIMA RODADA" : "TENTAR DE NOVO";
+  document.getElementById("botaoProxima").onclick = () => {
+    if (venceu) rodada++;
+    else { jogador.abates = 0; jogador.headshots = 0; rodada = 1; }
+    iniciarRodada(false);
+  };
+  setTimeout(() => mostrarTela("fim"), venceu ? 900 : 1200);
+}
+
+// ===== Troca de arma =====
+let armaAnterior = "pistola";
+function trocarArma(id, imediato) {
+  if (!imediato && (id === armaAtual || trocando > 0)) return;
+  if (armaAtual !== "faca" && armaAtual !== id) armaAnterior = armaAtual;
+  armaAtual = id;
+  recarregando = 0;
+  mirando = false;
+  trocando = imediato ? 0 : 0.35;
+  ORDEM_ARMAS.forEach(a => modelos[a].visible = a === id);
+  const slots = document.getElementById("slots");
+  slots.innerHTML = ORDEM_ARMAS.map(a => `<div class="${a === id ? "ativo" : ""}">${ARMAS[a].tecla} · ${ARMAS[a].nome}</div>`).join("");
+  atualizarHUD();
+}
+
+function recarregar() {
+  const a = ARMAS[armaAtual], s = estadoArmas[armaAtual];
+  if (a.corpoACorpo) return;
+  if (recarregando > 0 || trocando > 0 || s.pente === a.pente || s.reserva === 0) return;
+  recarregando = a.recarga;
+  mirando = false;
+  somRecarga();
+  mostrarAviso("RECARREGANDO...", a.recarga * 1000);
+}
+
+// ===== Tiro do jogador =====
+const raycaster = new THREE.Raycaster();
+
+function atirar() {
+  const a = ARMAS[armaAtual], s = estadoArmas[armaAtual];
+  const agora = performance.now();
+  if (estado !== "jogando") return;
+  if (a.corpoACorpo) return golpear(false);
+  if (recarregando > 0 || trocando > 0 || agora - ultimoTiro < a.cadencia) return;
+  if (s.pente <= 0) {
+    ultimoTiro = agora;
+    bip(900, 0.05, 0.1, "square");
+    recarregar();
+    return;
+  }
+  ultimoTiro = agora;
+  s.pente--;
+
+  const movendo = teclas.KeyW || teclas.KeyA || teclas.KeyS || teclas.KeyD;
+  let disp = mirando ? a.dispersaoMira : a.dispersao;
+  if (movendo) disp += a.dispersaoMov * (jogador.correndo ? 2 : 1);
+  if (jogador.agachado) disp *= 0.6;
+  if (!jogador.noChao) disp += 0.08;
+  disp += spray;
+
+  const alvos = solidos.concat(chao);
+  bots.forEach(b => { if (!b.morto) alvos.push(...b.partes); });
+
+  let acertou = false, matou = false;
+  for (let i = 0; i < a.chumbos; i++) {
+    const dir = new THREE.Vector3((Math.random() - 0.5) * 2 * disp, (Math.random() - 0.5) * 2 * disp, -1)
+      .normalize().applyQuaternion(camera.quaternion);
+    raycaster.set(camera.position, dir);
+    raycaster.far = a.alcance;
+    const hit = raycaster.intersectObjects(alvos, false)[0];
+    if (!hit) continue;
+    const bot = hit.object.userData.bot;
+    if (bot && !bot.morto) {
+      let dano = a.dano;
+      if (armaAtual === "escopeta") dano *= Math.max(0.3, 1 - hit.distance / a.alcance);
+      const naCabeca = hit.object.userData.cabeca;
+      if (naCabeca) dano *= 2.5;
+      acertou = true;
+      if (ferirBot(bot, dano, naCabeca)) matou = true;
+      particulas(hit.point, 0xa01010, 5);
+    } else {
+      if (hit.object.userData.barril) ferirBarril(hit.object, a.dano);
+      marcaDeTiro(hit);
+      particulas(hit.point, 0xffd080, 3);
+    }
+  }
+
+  if (acertou) mostrarAcerto(matou);
+
+  // Bots próximos ouvem o tiro
+  bots.forEach(b => {
+    if (!b.morto && b.grupo.position.distanceTo(jogador.pos) < (a.silenciosa ? 8 : 40)) {
+      b.ultimaPosVista = jogador.pos.clone();
+      b.alerta = Math.max(b.alerta, 4);
+    }
+  });
+
+  // Coice
+  spray = Math.min(spray + a.spray, 0.06);
+  jogador.pitch = Math.min(1.4, jogador.pitch + a.coice * (0.6 + Math.random() * 0.6));
+  jogador.yaw += (Math.random() - 0.5) * a.coice * 0.5;
+  coiceVisual = 1;
+  const clarao = modelos[armaAtual].userData.clarao;
+  clarao.visible = true;
+  clarao.material.rotation = Math.random() * Math.PI;
+  setTimeout(() => clarao.visible = false, 45);
+  somTiro(a.som || armaAtual, 1);
+
+  if (a.sairDoZoom) mirando = false; // sniper de ferrolho sai do zoom depois do tiro
+  if (s.pente === 0) setTimeout(recarregar, 250);
+  atualizarHUD();
+}
+
+// Golpe de faca: verifica 3 raios curtos na frente (mais fácil de acertar)
+let golpe = 0, golpeDuracao = 0, golpeForte = false;
+function golpear(forte) {
+  const a = ARMAS.faca;
+  const agora = performance.now();
+  if (estado !== "jogando" || trocando > 0 || agora - ultimoTiro < (forte ? a.cadenciaForte : a.cadencia)) return;
+  ultimoTiro = agora;
+  golpeForte = forte;
+  golpeDuracao = golpe = forte ? 0.45 : 0.3;
+  somFaca("corte");
+
+  const alvos = solidos.slice();
+  bots.forEach(b => { if (!b.morto) alvos.push(...b.partes); });
+  let melhor = null;
+  for (const desvio of [0, -0.25, 0.25]) {
+    const dir = new THREE.Vector3(desvio, -0.05, -1).normalize().applyQuaternion(camera.quaternion);
+    raycaster.set(camera.position, dir);
+    raycaster.far = a.alcance;
+    const hit = raycaster.intersectObjects(alvos, false)[0];
+    if (hit && (!melhor || (hit.object.userData.bot && !melhor.object.userData.bot))) melhor = hit;
+  }
+  if (!melhor) return;
+
+  const bot = melhor.object.userData.bot;
+  if (bot && !bot.morto) {
+    let dano = forte ? a.danoForte : a.dano;
+    // Pelas costas causa o dobro
+    const frenteBot = new THREE.Vector3(Math.sin(bot.grupo.rotation.y), 0, Math.cos(bot.grupo.rotation.y));
+    const paraJogador = new THREE.Vector3(jogador.pos.x - bot.grupo.position.x, 0, jogador.pos.z - bot.grupo.position.z).normalize();
+    if (frenteBot.dot(paraJogador) < -0.3) dano *= 2;
+    const naCabeca = melhor.object.userData.cabeca;
+    if (naCabeca) dano *= 1.5;
+    const matou = ferirBot(bot, dano, naCabeca);
+    mostrarAcerto(matou);
+    particulas(melhor.point, 0xa01010, 8);
+    somFaca("carne");
+  } else {
+    particulas(melhor.point, 0xffe0a0, 4);
+    somFaca("parede");
+  }
+}
+
+// ===== Granadas =====
+const geoGranada = new THREE.SphereGeometry(0.09, 10, 8);
+const matGranada = new THREE.MeshLambertMaterial({ color: 0x3f4a2a });
+
+function lancarGranada() {
+  const agora = performance.now();
+  if (estado !== "jogando" || granadas <= 0 || agora - ultimaGranada < 900) return;
+  granadas--;
+  ultimaGranada = agora;
+  const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  const m = new THREE.Mesh(geoGranada, matGranada);
+  m.position.copy(camera.position).addScaledVector(dir, 0.5);
+  m.position.y -= 0.1;
+  const vel = dir.multiplyScalar(jogador.agachado ? 11 : 16);
+  vel.y += 3.5;
+  cena.add(m);
+  listaGranadas.push({ mesh: m, vel, tempo: 2.2 });
+  trocando = Math.max(trocando, 0.3); // abaixa a arma enquanto arremessa
+  bip(1800, 0.03, 0.12, "square");
+  somFaca("corte");
+  atualizarHUD();
+}
+
+function atualizarGranadas(dt) {
+  for (let i = listaGranadas.length - 1; i >= 0; i--) {
+    const gr = listaGranadas[i];
+    const p = gr.mesh.position, v = gr.vel;
+    const anterior = p.clone();
+    v.y -= 18 * dt;
+    p.addScaledVector(v, dt);
+
+    // quica no chão
+    if (p.y < 0.09) {
+      p.y = 0.09;
+      if (v.y < 0) {
+        if (v.y < -2) bip(420, 0.03, 0.08, "triangle");
+        v.y = -v.y * 0.35;
+        v.x *= 0.65;
+        v.z *= 0.65;
+      }
+    }
+    // quica nas paredes e caixas
+    for (const c of colisores) {
+      if (p.y > (c.maxY || 3)) continue;
+      const r = 0.09;
+      if (p.x > c.minX - r && p.x < c.maxX + r && p.z > c.minZ - r && p.z < c.maxZ + r) {
+        const vinhaPorX = !(anterior.x > c.minX - r && anterior.x < c.maxX + r);
+        if (vinhaPorX) { v.x = -v.x * 0.5; p.x = anterior.x; }
+        else { v.z = -v.z * 0.5; p.z = anterior.z; }
+        bip(520, 0.03, 0.08, "triangle");
+        break;
+      }
+    }
+    gr.mesh.rotation.x += dt * 8;
+
+    gr.tempo -= dt;
+    if (gr.tempo <= 0) {
+      explodir(p.clone());
+      cena.remove(gr.mesh);
+      listaGranadas.splice(i, 1);
+    }
+  }
+}
+
+function explodir(pos, icone = "💣", forca = 1) {
+  // bola de fogo, luz e fumaça
+  const bola = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshBasicMaterial({
+    color: 0xffa030, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false
+  }));
+  bola.position.copy(pos);
+  cena.add(bola);
+  efeitos.push({ mesh: bola, vida: 0.45, max: 0.45, explosao: true, linha: true });
+  const luz = new THREE.PointLight(0xffa040, 3, 18);
+  luz.position.copy(pos).y += 1;
+  cena.add(luz);
+  efeitos.push({ mesh: luz, vida: 0.2 });
+  particulas(pos, 0xffc060, 14);
+  particulas(pos, 0x333333, 10);
+
+  const distJogador = pos.distanceTo(camera.position);
+  somExplosao(Math.max(0.15, 1 - distJogador / 60));
+  tremor = Math.max(tremor, 1 - distJogador / 25);
+
+  // A parede protege: se algo bloqueia, o dano cai bastante
+  const protegido = alvo => {
+    const origem = pos.clone().add(new THREE.Vector3(0, 0.3, 0));
+    const dir = alvo.clone().sub(origem);
+    const dist = dir.length();
+    raioVisao.set(origem, dir.normalize());
+    raioVisao.far = dist;
+    return raioVisao.intersectObjects(solidos, false).length > 0;
+  };
+
+  // barris por perto explodem em cadeia
+  barris.forEach(br => {
+    if (!br.userData.barril.explodido && br.parent && br.position.distanceTo(pos) < 4.5) {
+      setTimeout(() => { if (estado === "jogando") explodirBarril(br); }, 180);
+    }
+  });
+
+  bots.forEach(b => {
+    if (b.morto) return;
+    const centro = b.grupo.position.clone().add(new THREE.Vector3(0, 1.1, 0));
+    const d = pos.distanceTo(centro);
+    if (d < 7) {
+      const dano = 130 * forca * (1 - d / 7) * (protegido(centro) ? 0.25 : 1);
+      if (dano > 3 && ferirBot(b, dano, false, icone)) mostrarAcerto(true);
+    }
+    if (!b.morto && b.grupo.position.distanceTo(pos) < 45) {
+      b.ultimaPosVista = pos.clone();
+      b.alerta = Math.max(b.alerta, 4);
+    }
+  });
+
+  if (estado === "jogando" && distJogador < 6) {
+    const dano = 70 * forca * (1 - distJogador / 6) * (protegido(camera.position.clone()) ? 0.25 : 1);
+    jogador.vida -= Math.round(dano);
+    tempoDano = 1;
+    if (jogador.vida <= 0) {
+      jogador.vida = 0;
+      adicionarFeed(`Você ${icone} Você`, false);
+      fimDeRodada(false);
+    }
+  }
+  atualizarHUD();
+}
+
+function ferirBot(bot, dano, naCabeca, iconeArma) {
+  bot.vida -= dano;
+  bot.alerta = 5;
+  bot.ultimaPosVista = jogador.pos.clone();
+  bot.reacao = Math.max(bot.reacao, bot.tempoReacao * 0.6); // reage mais rápido ao levar tiro
+  if (bot.vida > 0) return false;
+
+  bot.morto = true;
+  jogador.abates++;
+  if (naCabeca) jogador.headshots++;
+  const icone = iconeArma || (armaAtual === "faca" ? "🔪" : "⌖");
+  adicionarFeed(`Você ${icone} ${bot.nome}${naCabeca ? " (na cabeça)" : ""}`, naCabeca || armaAtual === "faca");
+  bip(220, 0.15, 0.15, "triangle");
+
+  const vivos = bots.filter(b => !b.morto).length;
+  atualizarHUD();
+  if (vivos === 0) fimDeRodada(true);
+  return true;
+}
+
+// Furo de bala na parede
+const geoFuro = new THREE.PlaneGeometry(0.1, 0.1);
+const matFuro = new THREE.MeshBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.85, polygonOffset: true, polygonOffsetFactor: -4 });
+function marcaDeTiro(hit) {
+  if (!hit.face) return;
+  const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+  const m = new THREE.Mesh(geoFuro, matFuro);
+  m.position.copy(hit.point).addScaledVector(normal, 0.01);
+  m.lookAt(hit.point.clone().add(normal));
+  cena.add(m);
+  furos.push(m);
+  if (furos.length > 60) cena.remove(furos.shift());
+}
+
+// Pequenas partículas (faísca ou sangue)
+const geoParticula = new THREE.BoxGeometry(0.05, 0.05, 0.05);
+function particulas(ponto, cor, qtd) {
+  const mat = new THREE.MeshBasicMaterial({ color: cor });
+  for (let i = 0; i < qtd; i++) {
+    const m = new THREE.Mesh(geoParticula, mat);
+    m.position.copy(ponto);
+    cena.add(m);
+    efeitos.push({
+      mesh: m, vida: 0.35,
+      vel: new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3)
+    });
+  }
+}
+
+// Rastro da bala dos bots
+function rastro(de, ate, cor = 0xffe08a) {
+  const geo = new THREE.BufferGeometry().setFromPoints([de, ate]);
+  const linha = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: cor, transparent: true, opacity: 0.8 }));
+  cena.add(linha);
+  efeitos.push({ mesh: linha, vida: 0.07, linha: true });
+}
+
+// ===== Inteligência dos bots =====
+const raioVisao = new THREE.Raycaster();
+const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+
+function botVeJogador(bot) {
+  tmpA.copy(bot.grupo.position); tmpA.y = 1.65;
+  tmpB.copy(camera.position);
+  const dist = tmpA.distanceTo(tmpB);
+  if (dist > dif.visao * bot.tipo.visao) return false;
+  const dir = tmpB.sub(tmpA).normalize();
+
+  // Só enxerga o que está na frente (a não ser que esteja em alerta)
+  if (bot.alerta <= 0) {
+    const frente = new THREE.Vector3(Math.sin(bot.grupo.rotation.y), 0, Math.cos(bot.grupo.rotation.y));
+    if (frente.dot(new THREE.Vector3(dir.x, 0, dir.z).normalize()) < dif.campoVisao) return false;
+  }
+  raioVisao.set(tmpA, dir);
+  raioVisao.far = dist;
+  return raioVisao.intersectObjects(solidos, false).length === 0;
+}
+
+function virarPara(bot, x, z, dt, velocidade = 6) {
+  const alvo = Math.atan2(x - bot.grupo.position.x, z - bot.grupo.position.z);
+  let diff = alvo - bot.grupo.rotation.y;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  bot.grupo.rotation.y += diff * Math.min(1, dt * velocidade);
+}
+
+function andarBot(bot, dirX, dirZ, vel, dt) {
+  const len = Math.hypot(dirX, dirZ);
+  if (len < 0.001) return false;
+  const p = bot.grupo.position;
+  moverComColisao(p, (dirX / len) * vel * dt, (dirZ / len) * vel * dt, 0.35);
+  // não deixa o bot entrar no jogador
+  const dx = p.x - jogador.pos.x, dz = p.z - jogador.pos.z;
+  const d = Math.hypot(dx, dz);
+  if (d < 0.8 && d > 0) { p.x = jogador.pos.x + dx / d * 0.8; p.z = jogador.pos.z + dz / d * 0.8; }
+  return true;
+}
+
+function atualizarBots(dt) {
+  for (const bot of bots) {
+    const g = bot.grupo;
+
+    if (bot.morto) {
+      bot.tempoMorto += dt;
+      g.rotation.x = Math.max(-Math.PI / 2, g.rotation.x - dt * 5);
+      if (bot.tempoMorto > 5) g.visible = false;
+      continue;
+    }
+
+    bot.alerta = Math.max(0, bot.alerta - dt);
+    bot.cooldown -= dt;
+
+    // Checa a visão algumas vezes por segundo (economiza processamento)
+    bot.tempoVisao -= dt;
+    if (bot.tempoVisao <= 0) {
+      bot.tempoVisao = 0.15;
+      bot.visivel = botVeJogador(bot);
+      if (bot.visivel) { bot.ultimaPosVista = jogador.pos.clone(); bot.alerta = 3; }
+    }
+
+    const p = g.position;
+    let andando = false;
+    const dist = Math.hypot(jogador.pos.x - p.x, jogador.pos.z - p.z);
+
+    if (bot.visivel) {
+      // COMBATE: vira para o jogador, anda de lado e atira
+      virarPara(bot, jogador.pos.x, jogador.pos.z, dt, 8);
+      bot.reacao += dt;
+      bot.tempoDesvio -= dt;
+      if (bot.tempoDesvio <= 0) { bot.desvio *= -1; bot.tempoDesvio = 0.8 + Math.random() * 1.2; }
+      const dx = (jogador.pos.x - p.x) / dist, dz = (jogador.pos.z - p.z) / dist;
+      let mx = -dz * bot.desvio, mz = dx * bot.desvio;
+      const [perto, longe] = bot.tipo.distancia; // distância preferida de cada tipo
+      if (bot.tipo === TIPOS_BOT.atirador) { mx *= 0.3; mz *= 0.3; } // atirador quase não se mexe
+      if (dist > longe) { mx += dx; mz += dz; }
+      if (dist < perto) { mx -= dx; mz -= dz; }
+      andando = andarBot(bot, mx, mz, 2.2 * dif.velocidade * bot.tipo.velocidade, dt);
+
+      if (bot.reacao >= bot.tempoReacao && bot.cooldown <= 0) botAtira(bot, dist);
+    } else {
+      bot.reacao = Math.max(0, bot.reacao - dt * 2);
+      let destino = null;
+      if (bot.ultimaPosVista && bot.alerta > 0) destino = bot.ultimaPosVista;
+      else {
+        bot.ultimaPosVista = null;
+        if (!bot.alvo || Math.hypot(bot.alvo.x - p.x, bot.alvo.z - p.z) < 1.5) {
+          bot.alvo = pontosRota[Math.floor(Math.random() * pontosRota.length)];
+        }
+        destino = bot.alvo;
+      }
+      const dx = destino.x - p.x, dz = destino.z - p.z;
+      if (Math.hypot(dx, dz) > 1.2) {
+        virarPara(bot, destino.x, destino.z, dt, 5);
+        andando = andarBot(bot, dx, dz, (bot.alerta > 0 ? 3.6 : 2.4) * dif.velocidade * bot.tipo.velocidade, dt);
+      } else if (bot.ultimaPosVista) {
+        bot.ultimaPosVista = null; // chegou e não achou ninguém
+        bot.alerta = 0;
+      }
+
+      // Se ficou preso numa parede, escolhe outro caminho
+      bot.travado += dt;
+      if (bot.travado > 1) {
+        if (bot.posAnterior.distanceTo(p) < 0.5) {
+          bot.alvo = pontosRota[Math.floor(Math.random() * pontosRota.length)];
+          bot.ultimaPosVista = null;
+        }
+        bot.posAnterior.copy(p);
+        bot.travado = 0;
+      }
+    }
+
+    // Animação das pernas
+    if (andando) {
+      bot.passo += dt * 9;
+      // passos dos bots: você ouve quem está perto, e de que lado está
+      bot.distPasso = (bot.distPasso || 0) + dt;
+      if (bot.distPasso > 0.42) {
+        bot.distPasso = 0;
+        const d = p.distanceTo(jogador.pos);
+        if (d < 22) {
+          const dir = new THREE.Vector3(p.x - jogador.pos.x, 0, p.z - jogador.pos.z).normalize();
+          const lado = dir.dot(new THREE.Vector3(Math.cos(jogador.yaw), 0, -Math.sin(jogador.yaw)));
+          somPasso(0.8 * (1 - d / 22), lado);
+        }
+      }
+    }
+    const ang = andando ? Math.sin(bot.passo) * 0.6 : 0;
+    bot.pernas[0].rotation.x = ang;
+    bot.pernas[1].rotation.x = -ang;
+  }
+}
+
+function botAtira(bot, dist) {
+  if (estado !== "jogando") return;
+  const melhora = 1 + (rodada - 1) * dif.crescimento; // bots melhoram a cada rodada
+  const tipo = bot.tipo;
+  bot.cooldown = sortear(dif.cadencia) * tipo.cadencia / melhora;
+  const movendo = teclas.KeyW || teclas.KeyA || teclas.KeyS || teclas.KeyD;
+  let chance = 0.6 - dist * 0.009 * (tipo === TIPOS_BOT.atirador ? 0.3 : 1);
+  if (movendo) chance -= 0.15;
+  if (jogador.correndo) chance -= 0.08;
+  if (jogador.agachado) chance -= 0.12;
+  if (!jogador.noChao) chance -= 0.1;
+  chance = Math.max(0.05, Math.min(0.6, chance)) * Math.min(1.3, dif.precisao * melhora) * tipo.precisao;
+  const acertou = Math.random() < chance;
+
+  const de = bot.boca.getWorldPosition(new THREE.Vector3());
+  const ate = camera.position.clone().add(new THREE.Vector3(0, -0.3, 0));
+  if (!acertou) ate.add(new THREE.Vector3((Math.random() - 0.5) * 2.5, (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 2.5));
+  rastro(de, ate, tipo.rastro);
+  somTiro(tipo.som, Math.max(0.08, 1 - dist / 50) * 0.6);
+
+  if (acertou) {
+    jogador.vida -= Math.round(sortear(dif.dano) * Math.min(1.4, melhora) * tipo.dano);
+    tempoDano = 1;
+    bip(120, 0.08, 0.2, "sawtooth");
+    if (jogador.vida <= 0) {
+      jogador.vida = 0;
+      adicionarFeed(`${bot.nome} ⌖ Você`, false);
+      fimDeRodada(false);
+    }
+    atualizarHUD();
+  }
+}
+
+// ===== Atualização do jogador =====
+function atualizarJogador(dt) {
+  const a = ARMAS[armaAtual];
+  let vel = 5.5 * a.velocidade;
+  const querMover = teclas.KeyW || teclas.KeyA || teclas.KeyS || teclas.KeyD;
+  jogador.agachado = !!teclas.KeyC && jogador.noChao;
+  jogador.correndo = !!(teclas.ShiftLeft || teclas.ShiftRight) && querMover && !jogador.agachado && recarregando <= 0;
+  if (jogador.correndo) { vel *= 1.6; mirando = false; }
+  if (jogador.agachado) vel *= 0.45;
+  if (mirando) vel *= 0.6;
+  const alturaAlvo = jogador.agachado ? 1.05 : 1.65;
+  jogador.altura += (alturaAlvo - jogador.altura) * Math.min(1, dt * 12);
+  document.getElementById("postura").textContent = jogador.correndo ? "▶▶ CORRENDO" : jogador.agachado ? "▼ AGACHADO" : "";
+
+  const frente = new THREE.Vector3(-Math.sin(jogador.yaw), 0, -Math.cos(jogador.yaw));
+  const direita = new THREE.Vector3(Math.cos(jogador.yaw), 0, -Math.sin(jogador.yaw));
+  const mov = new THREE.Vector3();
+  if (teclas.KeyW) mov.add(frente);
+  if (teclas.KeyS) mov.sub(frente);
+  if (teclas.KeyD) mov.add(direita);
+  if (teclas.KeyA) mov.sub(direita);
+  const andando = mov.lengthSq() > 0;
+  if (andando) {
+    mov.normalize().multiplyScalar(vel * dt);
+    moverComColisao(jogador.pos, mov.x, mov.z, 0.4);
+    balanco += dt * vel * 1.8;
+  }
+
+  // Pulo e gravidade
+  jogador.vy -= 18 * dt;
+  jogador.pos.y += jogador.vy * dt;
+  if (jogador.pos.y <= 0) {
+    if (!jogador.noChao && jogador.vy < -4) somPasso(1.2, 0); // aterrissagem
+    jogador.pos.y = 0; jogador.vy = 0; jogador.noChao = true;
+  }
+
+  // Sons de passos (correndo é mais alto, agachado quase não faz barulho)
+  if (andando && jogador.noChao) {
+    distPasso += vel * dt;
+    const tamanhoPasso = jogador.correndo ? 2.4 : jogador.agachado ? 1.3 : 1.9;
+    if (distPasso >= tamanhoPasso) {
+      distPasso = 0;
+      somPasso(jogador.correndo ? 1 : jogador.agachado ? 0.2 : 0.55, 0);
+    }
+  }
+
+  // Coice volta aos poucos
+  spray = Math.max(0, spray - dt * 0.12);
+  if (!atirando) spray = Math.max(0, spray - dt * 0.2);
+
+  camera.position.set(jogador.pos.x, jogador.pos.y + jogador.altura, jogador.pos.z);
+  camera.rotation.set(jogador.pitch, jogador.yaw, 0);
+  // tremor da câmera nas explosões
+  if (tremor > 0) {
+    camera.rotation.x += (Math.random() - 0.5) * tremor * 0.08;
+    camera.rotation.y += (Math.random() - 0.5) * tremor * 0.08;
+    tremor = Math.max(0, tremor - dt * 2);
+  }
+
+  // Zoom
+  const lunetaAtiva = mirando && armaAtual === "sniper";
+  const fovAlvo = mirando ? a.fovMira : 75;
+  camera.fov += (fovAlvo - camera.fov) * Math.min(1, dt * 14);
+  camera.updateProjectionMatrix();
+  document.getElementById("luneta").classList.toggle("ativa", lunetaAtiva);
+  document.getElementById("mira").classList.toggle("escondida", mirando);
+  modelos[armaAtual].visible = !lunetaAtiva;
+
+  // Abertura da mira conforme a precisão atual
+  let disp = mirando ? a.dispersaoMira : a.dispersao;
+  if (andando) disp += a.dispersaoMov * (jogador.correndo ? 2 : 1);
+  if (jogador.agachado) disp *= 0.6;
+  if (!jogador.noChao) disp += 0.08;
+  disp += spray;
+  const abertura = 4 + disp * 260;
+  document.getElementById("miraE").style.left = `${-abertura - 9}px`;
+  document.getElementById("miraD").style.left = `${abertura}px`;
+  document.getElementById("miraC").style.top = `${-abertura - 9}px`;
+  document.getElementById("miraB").style.top = `${abertura}px`;
+
+  // Recarga
+  if (recarregando > 0) {
+    recarregando -= dt;
+    if (recarregando <= 0) {
+      const s = estadoArmas[armaAtual];
+      const falta = a.pente - s.pente;
+      const pega = Math.min(falta, s.reserva);
+      s.pente += pega;
+      s.reserva -= pega;
+      recarregando = 0;
+      atualizarHUD();
+    }
+  }
+  if (trocando > 0) trocando -= dt;
+
+  // Movimento da arma na mão
+  const pose = POSE[armaAtual];
+  const alvoPos = mirando ? pose.mira : pose.base;
+  const g = modelos[armaAtual];
+  const bob = andando && jogador.noChao ? 1 : 0;
+  const fatorBob = mirando ? 0.2 : jogador.correndo ? 2.2 : 1;
+  let x = alvoPos[0] + Math.cos(balanco) * 0.012 * bob * fatorBob;
+  let y = alvoPos[1] + Math.abs(Math.sin(balanco)) * 0.012 * bob * fatorBob;
+  let z = alvoPos[2] + coiceVisual * 0.06;
+  if (recarregando > 0) y -= 0.12;
+  if (jogador.correndo) { y -= 0.04; x += 0.03; }
+  if (trocando > 0) y -= trocando * 0.6;
+  g.position.x += (x - g.position.x) * Math.min(1, dt * 16);
+  g.position.y += (y - g.position.y) * Math.min(1, dt * 16);
+  g.position.z = z;
+  g.rotation.x = coiceVisual * 0.12 + (recarregando > 0 ? 0.5 : 0);
+  g.rotation.y = 0;
+  g.rotation.z = 0;
+  coiceVisual = Math.max(0, coiceVisual - dt * 9);
+
+  // Animação da faca: corte de lado ou estocada para frente
+  if (golpe > 0) {
+    golpe = Math.max(0, golpe - dt);
+    const f = Math.sin((1 - golpe / golpeDuracao) * Math.PI);
+    if (golpeForte) {
+      g.position.z = z - f * 0.25;
+      g.position.y = y + f * 0.05;
+      g.rotation.x = -f * 0.3;
+    } else {
+      g.position.x = x - f * 0.25;
+      g.rotation.z = f * 1.1;
+      g.rotation.y = f * 0.6;
+    }
+  }
+
+  // Efeito vermelho de dano
+  tempoDano = Math.max(0, tempoDano - dt * 2);
+  document.getElementById("dano").style.opacity = tempoDano * 0.8;
+}
+
+function atualizarEfeitos(dt) {
+  for (let i = efeitos.length - 1; i >= 0; i--) {
+    const e = efeitos[i];
+    e.vida -= dt;
+    if (e.explosao) {
+      e.mesh.scale.setScalar(1 + (1 - e.vida / e.max) * 3.5);
+      e.mesh.material.opacity = Math.max(0, e.vida / e.max) * 0.9;
+    }
+    if (e.vel) {
+      e.vel.y -= 9 * dt;
+      e.mesh.position.addScaledVector(e.vel, dt);
+    }
+    if (e.vida <= 0) {
+      cena.remove(e.mesh);
+      if (e.linha) { e.mesh.geometry.dispose(); e.mesh.material.dispose(); }
+      efeitos.splice(i, 1);
+    }
+  }
+}
+
+// ===== HUD =====
+function atualizarHUD() {
+  const s = estadoArmas[armaAtual];
+  if (!s) return;
+  document.getElementById("valorVida").textContent = Math.max(0, Math.ceil(jogador.vida));
+  const barra = document.querySelector("#barraVida div");
+  barra.style.width = `${Math.max(0, jogador.vida)}%`;
+  barra.style.background = jogador.vida > 50 ? "#6fdc6f" : jogador.vida > 25 ? "#f2a531" : "#e5484d";
+  document.getElementById("nomeArma").textContent = ARMAS[armaAtual].nome.toUpperCase();
+  document.getElementById("municao").innerHTML = ARMAS[armaAtual].corpoACorpo ? "∞" : `${s.pente} <small>/ ${s.reserva}</small>`;
+  document.getElementById("granadas").innerHTML = `💣 × ${granadas} <small>[E]</small>`;
+  document.getElementById("restantes").textContent = bots.filter(b => !b.morto).length;
+  document.getElementById("abates").textContent = jogador.abates;
+}
+
+let timerAcerto = null;
+function mostrarAcerto(morte) {
+  const el = document.getElementById("acerto");
+  el.classList.toggle("morte", morte);
+  el.style.opacity = 1;
+  bip(morte ? 1400 : 1900, 0.04, 0.12, "square");
+  clearTimeout(timerAcerto);
+  timerAcerto = setTimeout(() => el.style.opacity = 0, morte ? 300 : 120);
+}
+
+let timerAviso = null;
+function mostrarAviso(texto, duracao) {
+  const el = document.getElementById("aviso-centro");
+  el.textContent = texto;
+  clearTimeout(timerAviso);
+  timerAviso = setTimeout(() => el.textContent = "", duracao);
+}
+
+function adicionarFeed(texto, destaque) {
+  const feed = document.getElementById("feed");
+  const div = document.createElement("div");
+  div.textContent = texto;
+  if (destaque) div.className = "hs";
+  feed.prepend(div);
+  setTimeout(() => div.remove(), 5000);
+}
+
+// ===== Sons (gerados pelo navegador) =====
+let audio = null, bufferRuido = null;
+function ctxAudio() {
+  if (!audio) {
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    bufferRuido = audio.createBuffer(1, audio.sampleRate * 0.8, audio.sampleRate);
+    const d = bufferRuido.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (audio.state === "suspended") audio.resume();
+  return audio;
+}
+
+function somTiro(tipo, volume) {
+  const a = ctxAudio();
+  const cfg = {
+    pistola:  { filtro: 2400, duracao: 0.16, vol: 0.45, grave: 160 },
+    revolver: { filtro: 1800, duracao: 0.3,  vol: 0.65, grave: 110 },
+    pesada:   { filtro: 1500, duracao: 0.32, vol: 0.7,  grave: 100 },
+    smg:      { filtro: 2600, duracao: 0.13, vol: 0.4,  grave: 170 },
+    silenciada: { filtro: 1100, duracao: 0.07, vol: 0.16, grave: 220 },
+    m4:       { filtro: 2000, duracao: 0.18, vol: 0.48, grave: 140 },
+    cano:     { filtro: 900,  duracao: 0.5,  vol: 0.9,  grave: 70 },
+    scout:    { filtro: 1300, duracao: 0.4,  vol: 0.65, grave: 110 },
+    semi:     { filtro: 1100, duracao: 0.45, vol: 0.7,  grave: 100 },
+    fuzil:    { filtro: 1700, duracao: 0.2,  vol: 0.5,  grave: 130 },
+    sniper:   { filtro: 900,  duracao: 0.6,  vol: 0.8,  grave: 90 },
+    escopeta: { filtro: 1100, duracao: 0.4,  vol: 0.75, grave: 80 },
+    bot:      { filtro: 1500, duracao: 0.22, vol: 0.45, grave: 120 }
+  }[tipo];
+  const t = a.currentTime;
+
+  const fonte = a.createBufferSource();
+  fonte.buffer = bufferRuido;
+  const filtro = a.createBiquadFilter();
+  filtro.type = "lowpass";
+  filtro.frequency.value = cfg.filtro;
+  const ganho = a.createGain();
+  ganho.gain.setValueAtTime(cfg.vol * volume, t);
+  ganho.gain.exponentialRampToValueAtTime(0.001, t + cfg.duracao);
+  fonte.connect(filtro).connect(ganho).connect(a.destination);
+  fonte.start(t);
+  fonte.stop(t + cfg.duracao + 0.05);
+
+  const osc = a.createOscillator();
+  const g2 = a.createGain();
+  osc.frequency.setValueAtTime(cfg.grave, t);
+  osc.frequency.exponentialRampToValueAtTime(35, t + 0.15);
+  g2.gain.setValueAtTime(0.6 * cfg.vol * volume, t);
+  g2.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  osc.connect(g2).connect(a.destination);
+  osc.start(t);
+  osc.stop(t + 0.2);
+}
+
+function bip(freq, duracao, volume, tipo, atraso = 0) {
+  const a = ctxAudio();
+  const t = a.currentTime + atraso;
+  const osc = a.createOscillator();
+  const g = a.createGain();
+  osc.type = tipo;
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(volume, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + duracao);
+  osc.connect(g).connect(a.destination);
+  osc.start(t);
+  osc.stop(t + duracao + 0.02);
+}
+
+// Passo: som muda conforme o chão do mapa. "lado" vai de -1 (esquerda) a 1 (direita)
+function somPasso(volume, lado) {
+  const a = ctxAudio();
+  const t = a.currentTime;
+  const cfg = {
+    deserto: { freq: 700, q: 0.8, dur: 0.1 },
+    armazem: { freq: 1800, q: 1.3, dur: 0.06 },
+    cidade:  { freq: 1300, q: 1, dur: 0.07 },
+    neve:    { freq: 2600, q: 0.6, dur: 0.15 },
+    base:    { freq: 900, q: 0.9, dur: 0.09 },
+    porto:   { freq: 1200, q: 1, dur: 0.07 }
+  }[mapaEscolhido];
+  const saida = a.createStereoPanner ? a.createStereoPanner() : a.createGain();
+  if (saida.pan) saida.pan.value = Math.max(-1, Math.min(1, lado));
+  saida.connect(a.destination);
+
+  const fonte = a.createBufferSource();
+  fonte.buffer = bufferRuido;
+  fonte.playbackRate.value = 0.8 + Math.random() * 0.4;
+  const filtro = a.createBiquadFilter();
+  filtro.type = "bandpass";
+  filtro.frequency.value = cfg.freq * (0.85 + Math.random() * 0.3);
+  filtro.Q.value = cfg.q;
+  const ganho = a.createGain();
+  ganho.gain.setValueAtTime(0.0001, t);
+  ganho.gain.exponentialRampToValueAtTime(0.5 * volume + 0.0001, t + 0.008);
+  ganho.gain.exponentialRampToValueAtTime(0.0001, t + cfg.dur);
+  fonte.connect(filtro).connect(ganho).connect(saida);
+  fonte.start(t, Math.random() * 0.5);
+  fonte.stop(t + cfg.dur + 0.02);
+
+  const osc = a.createOscillator();
+  const g2 = a.createGain();
+  osc.frequency.setValueAtTime(95, t);
+  osc.frequency.exponentialRampToValueAtTime(45, t + 0.06);
+  g2.gain.setValueAtTime(0.3 * volume + 0.0001, t);
+  g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+  osc.connect(g2).connect(saida);
+  osc.start(t);
+  osc.stop(t + 0.08);
+}
+
+// Sons da faca: corte no ar, acerto no inimigo e batida na parede
+function somFaca(tipo) {
+  const a = ctxAudio();
+  const t = a.currentTime;
+  if (tipo === "corte") {
+    const fonte = a.createBufferSource();
+    fonte.buffer = bufferRuido;
+    const filtro = a.createBiquadFilter();
+    filtro.type = "bandpass";
+    filtro.Q.value = 2;
+    filtro.frequency.setValueAtTime(700, t);
+    filtro.frequency.exponentialRampToValueAtTime(3500, t + 0.15);
+    const g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    fonte.connect(filtro).connect(g).connect(a.destination);
+    fonte.start(t);
+    fonte.stop(t + 0.2);
+  } else if (tipo === "carne") {
+    bip(140, 0.12, 0.35, "sine");
+    bip(90, 0.15, 0.3, "triangle", 0.02);
+  } else {
+    bip(2600, 0.08, 0.15, "triangle");
+    bip(3400, 0.06, 0.1, "triangle", 0.01);
+  }
+}
+
+function somExplosao(volume) {
+  const a = ctxAudio();
+  const t = a.currentTime;
+  const fonte = a.createBufferSource();
+  fonte.buffer = bufferRuido;
+  fonte.playbackRate.value = 0.6;
+  const filtro = a.createBiquadFilter();
+  filtro.type = "lowpass";
+  filtro.frequency.setValueAtTime(1200, t);
+  filtro.frequency.exponentialRampToValueAtTime(200, t + 1.1);
+  const g = a.createGain();
+  g.gain.setValueAtTime(1.1 * volume, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+  fonte.connect(filtro).connect(g).connect(a.destination);
+  fonte.start(t);
+  fonte.stop(t + 1.25);
+
+  const osc = a.createOscillator();
+  const g2 = a.createGain();
+  osc.frequency.setValueAtTime(70, t);
+  osc.frequency.exponentialRampToValueAtTime(25, t + 0.8);
+  g2.gain.setValueAtTime(0.9 * volume, t);
+  g2.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+  osc.connect(g2).connect(a.destination);
+  osc.start(t);
+  osc.stop(t + 0.95);
+}
+
+function somRecarga() {
+  bip(600, 0.05, 0.12, "square");
+  bip(400, 0.06, 0.12, "square", ARMAS[armaAtual].recarga * 0.5);
+  bip(900, 0.05, 0.12, "square", ARMAS[armaAtual].recarga * 0.9);
+}
+
+// ===== Arsenal =====
+function abrirArsenal() {
+  if (estado !== "jogando") return;
+  estado = "arsenal";
+  atirando = false;
+  mirando = false;
+  const colunas = document.getElementById("colunasArsenal");
+  colunas.innerHTML = ORDEM_ARMAS.filter(tipo => VARIANTES[tipo]).map(tipo => `
+    <div>
+      <h2>${TECLAS_ARMA[tipo]} · ${NOMES_TIPO[tipo]}</h2>
+      ${VARIANTES[tipo].map((v, i) => `
+        <div class="cartao ${varianteAtual[tipo] === i ? "selecionado" : ""}" data-tipo="${tipo}" data-indice="${i}">
+          <h3>${v.nome}</h3>
+          <p>${v.descricao}</p>
+          <div class="tag">${v.corpoACorpo ? `Corpo a corpo · alcance ${v.alcance} m` : `${v.automatica ? "Automática" : "Semiautomática"} · ${v.pente} balas`}</div>
+          ${["dano", "cadencia", "precisao"].map(st =>
+            `<div class="barra"><span>${{ dano: "Dano", cadencia: "Cadência", precisao: "Precisão" }[st]}</span>` +
+            `<div class="trilho"><div class="cheio" style="width:${v.stats[st]}%"></div></div></div>`).join("")}
+        </div>`).join("")}
+    </div>`).join("");
+  colunas.querySelectorAll(".cartao").forEach(c => c.addEventListener("click", () => {
+    equiparVariante(c.dataset.tipo, Number(c.dataset.indice));
+    bip(700, 0.05, 0.12, "square");
+    fecharArsenal();
+  }));
+  mostrarTela("arsenal");
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+function fecharArsenal() {
+  if (estado !== "arsenal") return;
+  estado = "jogando";
+  mostrarTela(null);
+  travarMouse();
+}
+
+document.getElementById("botaoFecharArsenal").addEventListener("click", fecharArsenal);
+
+// ===== Controles =====
+document.addEventListener("keydown", e => {
+  teclas[e.code] = true;
+  if (e.code === "KeyB" && estado === "arsenal") return fecharArsenal();
+  if (estado !== "jogando") return;
+  if (e.code === "KeyB") abrirArsenal();
+  if (e.code === "KeyE") lancarGranada();
+  // Q puxa a faca; apertando de novo, volta para a arma anterior
+  if (e.code === "KeyQ") trocarArma(armaAtual === "faca" ? armaAnterior : "faca");
+  if (e.code === "KeyR") recarregar();
+  if (e.code === "KeyP") pausar();
+  if (e.code === "Space") {
+    e.preventDefault();
+    if (jogador.noChao && !jogador.agachado) { jogador.vy = 6; jogador.noChao = false; }
+  }
+  const num = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5"].indexOf(e.code);
+  if (num >= 0) trocarArma(ORDEM_ARMAS[num]);
+});
+
+document.addEventListener("keyup", e => teclas[e.code] = false);
+
+// ===== Sensibilidade do mouse (fica salva no navegador) =====
+let sensibilidade = 1;
+try { sensibilidade = Number(localStorage.getItem("zonaSensibilidade")) || 1; } catch (e) {}
+function aplicarSensibilidade(valor) {
+  sensibilidade = Math.max(0.2, Math.min(3, valor));
+  document.querySelectorAll(".sens").forEach(s => s.value = sensibilidade);
+  document.querySelectorAll(".valor-sens").forEach(v => v.textContent = sensibilidade.toFixed(1) + "x");
+  try { localStorage.setItem("zonaSensibilidade", sensibilidade); } catch (e) {}
+}
+document.querySelectorAll(".sens").forEach(s => s.addEventListener("input", () => aplicarSensibilidade(Number(s.value))));
+aplicarSensibilidade(sensibilidade);
+
+document.addEventListener("mousemove", e => {
+  if (estado !== "jogando" || document.pointerLockElement !== renderer.domElement) return;
+  const sens = 0.0022 * sensibilidade * (mirando ? ARMAS[armaAtual].fovMira / 75 : 1);
+  jogador.yaw -= e.movementX * sens;
+  jogador.pitch -= e.movementY * sens;
+  jogador.pitch = Math.max(-1.5, Math.min(1.5, jogador.pitch));
+});
+
+document.addEventListener("mousedown", e => {
+  if (estado !== "jogando") return;
+  if (document.pointerLockElement !== renderer.domElement) { travarMouse(); return; }
+  if (e.button === 0) { atirando = true; atirar(); }
+  if (e.button === 2 && ARMAS[armaAtual].corpoACorpo) golpear(true);
+  else if (e.button === 2 && recarregando <= 0 && !jogador.correndo) mirando = !mirando;
+});
+
+document.addEventListener("mouseup", e => { if (e.button === 0) atirando = false; });
+document.addEventListener("contextmenu", e => e.preventDefault());
+
+// Se o mouse for solto (ex.: alt+tab), pausa o jogo
+document.addEventListener("pointerlockchange", () => {
+  if (!document.pointerLockElement && estado === "jogando") pausar();
+});
+
+document.getElementById("botaoJogar").addEventListener("click", () => { ctxAudio(); iniciarRodada(true); });
+document.getElementById("botaoContinuar").addEventListener("click", continuar);
+document.getElementById("botaoMenuPausa").addEventListener("click", irParaMenu);
+document.getElementById("botaoMenuFim").addEventListener("click", irParaMenu);
+
+// ===== Laço principal =====
+let ultimoQuadro = performance.now();
+function laco(agora) {
+  requestAnimationFrame(laco);
+  const dt = Math.min(0.05, (agora - ultimoQuadro) / 1000);
+  ultimoQuadro = agora;
+
+  if (estado === "jogando") {
+    atualizarJogador(dt);
+    atualizarBots(dt);
+    atualizarGranadas(dt);
+    if (atirando && ARMAS[armaAtual].automatica) atirar();
+  }
+  if (estado === "jogando" || estado === "fim") {
+    if (estado === "fim") atualizarBots(dt);
+    atualizarEfeitos(dt);
+  }
+
+  renderer.clear();
+  if (cena && estado !== "menu") {
+    renderer.render(cena, camera);
+    renderer.clearDepth();
+    if (estado === "jogando" || estado === "pausado" || estado === "arsenal") renderer.render(cenaArma, cameraArma);
+  }
+}
+requestAnimationFrame(laco);
+</script>
+</body>
+</html>

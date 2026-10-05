@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Batida Neon · Fliperama Neon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Exo+2:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fundo: #0b0820; --painel: rgba(18, 10, 44, 0.88); --borda: #3a2a7a; --texto: #f6f0ff; --suave: #b3a6e0;
+    --ciano: #00f0ff; --rosa: #ff2bd6; --amarelo: #ffe600; --verde: #39ff88;
+    --titulo: "Press Start 2P", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--fundo); color: var(--texto); font-family: "Exo 2", "Segoe UI", Arial, sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+  canvas { display: block; }
+
+  .tela {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    gap: 16px; padding: 20px 16px; overflow-y: auto; text-align: center; touch-action: pan-y;
+    background: linear-gradient(180deg, rgba(14, 4, 40, 0.95), rgba(70, 14, 90, 0.92) 75%, rgba(255, 43, 214, 0.7));
+  }
+  .tela > :first-child { margin-top: auto; }
+  .tela > :last-child { margin-bottom: auto; }
+  .tela.escondida { display: none; }
+  .voltar { align-self: flex-start; color: var(--suave); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--borda); padding: 6px 12px; border-radius: 8px; background: rgba(0,0,0,0.25); }
+  .voltar:hover { color: var(--ciano); border-color: var(--ciano); }
+  .logo { font-family: var(--titulo); font-size: clamp(1.6rem, 6vw, 3.2rem); line-height: 1.3; color: var(--ciano);
+    text-shadow: 0 0 12px var(--ciano), 0 0 30px rgba(0, 240, 255, 0.6), 4px 4px 0 #2a0a4a; }
+  .logo span { color: var(--rosa); text-shadow: 0 0 12px var(--rosa), 0 0 30px rgba(255, 43, 214, 0.6), 4px 4px 0 #2a0a4a; }
+  .sub { color: var(--suave); letter-spacing: 3px; font-size: 0.85rem; }
+  .secao h2 { font-size: 0.8rem; letter-spacing: 3px; color: var(--suave); margin-bottom: 10px; }
+  .opcoes { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .opcao { background: var(--painel); border: 2px solid var(--borda); border-radius: 12px; padding: 10px 16px; cursor: pointer; color: var(--texto); font-family: inherit; font-weight: 700; font-size: 0.95rem; min-width: 110px; }
+  .opcao small { display: block; font-weight: 400; color: var(--suave); font-size: 0.75rem; }
+  .opcao .rec { display: block; color: var(--amarelo); font-size: 0.72rem; margin-top: 4px; }
+  .opcao.selecionada { border-color: var(--amarelo); box-shadow: 0 0 16px rgba(255, 230, 0, 0.45); }
+  .musica { width: 180px; text-align: left; }
+  .musica .bpm { font-family: var(--titulo); font-size: 0.55rem; color: var(--rosa); display: block; margin-bottom: 6px; }
+  .ajustes { display: grid; gap: 10px; background: var(--painel); border: 1px solid var(--borda); border-radius: 12px; padding: 12px 16px; min-width: min(420px, 92vw); }
+  .ajustes label { display: flex; align-items: center; gap: 10px; justify-content: space-between; font-size: 0.85rem; color: var(--suave); }
+  .ajustes input { flex: 1; accent-color: var(--rosa); }
+  .ajustes b { color: var(--amarelo); min-width: 60px; text-align: right; }
+  .botao { font-family: var(--titulo); font-size: 1rem; background: linear-gradient(90deg, var(--rosa), #b06bff); color: #fff; border: none; border-radius: 10px; padding: 16px 40px; cursor: pointer; box-shadow: 0 0 24px rgba(255, 43, 214, 0.55), 0 5px 0 #6a1a8a; }
+  .botao:hover { transform: translateY(-2px); }
+  .botao.sec { background: rgba(0,0,0,0.35); box-shadow: 0 0 0 2px var(--borda); }
+  .controles { font-size: 0.85rem; color: var(--suave); line-height: 2; }
+  .controles b { color: var(--texto); background: rgba(0,0,0,0.35); padding: 2px 8px; border-radius: 4px; }
+  .nota-final { font-family: var(--titulo); font-size: 4.5rem; line-height: 1; }
+  .resultado { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: min(420px, 92vw); }
+  .resultado div { background: var(--painel); border: 1px solid var(--borda); border-radius: 10px; padding: 10px; }
+  .resultado small { display: block; color: var(--suave); font-size: 0.75rem; }
+  .resultado b { font-size: 1.3rem; }
+  .linha-botoes { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+</style>
+</head>
+<body>
+
+<canvas id="tela"></canvas>
+
+<!-- ===== Menu ===== -->
+<div class="tela" id="menu">
+  <a href="fliperama-neon.html" class="voltar">← Voltar ao Fliperama</a>
+  <div class="logo">BATIDA <span>NEON</span></div>
+  <div class="sub">APERTE NO RITMO DA MÚSICA</div>
+
+  <div class="secao">
+    <h2>ESCOLHA A MÚSICA</h2>
+    <div class="opcoes" id="opcoesMusica"></div>
+  </div>
+
+  <div class="secao">
+    <h2>DIFICULDADE</h2>
+    <div class="opcoes" id="opcoesDif">
+      <button class="opcao" data-dif="facil">Fácil<small>só as batidas</small></button>
+      <button class="opcao selecionada" data-dif="normal">Normal<small>batida + melodia</small></button>
+      <button class="opcao" data-dif="dificil">Difícil<small>notas rápidas e duplas</small></button>
+    </div>
+  </div>
+
+  <div class="ajustes">
+    <label>Velocidade das notas <input type="range" id="velNotas" min="1" max="2.5" step="0.1" value="1.4"> <b id="valorVel">1.4x</b></label>
+    <label>Ajuste de atraso <input type="range" id="atraso" min="-150" max="150" step="10" value="0"> <b id="valorAtraso">0 ms</b></label>
+  </div>
+
+  <button class="botao" id="botaoJogar">TOCAR!</button>
+  <div class="controles">
+    PC: <b>D</b> <b>F</b> <b>J</b> <b>K</b> (ou as setas ← ↓ ↑ →) · <b>P</b> pausa<br>
+    Celular: toque nas 4 colunas lá embaixo
+  </div>
+</div>
+
+<!-- ===== Pausa ===== -->
+<div class="tela escondida" id="pausa">
+  <div class="logo" style="font-size: 2rem">PAUSADO</div>
+  <div class="linha-botoes">
+    <button class="botao" id="botaoContinuar">CONTINUAR</button>
+    <button class="botao sec" id="botaoMenuPausa">MENU</button>
+  </div>
+</div>
+
+<!-- ===== Resultado ===== -->
+<div class="tela escondida" id="fim">
+  <div class="sub" id="nomeMusicaFim"></div>
+  <div class="nota-final" id="notaFinal">S</div>
+  <div class="resultado">
+    <div><small>PONTOS</small><b id="rPontos">0</b></div>
+    <div><small>PRECISÃO</small><b id="rPrecisao">0%</b></div>
+    <div><small>MAIOR COMBO</small><b id="rCombo">0</b></div>
+    <div><small>NOTAS</small><b id="rNotas">0</b></div>
+    <div><small>PERFEITO / ÓTIMO</small><b id="rPerfeito">0 / 0</b></div>
+    <div><small>BOM / ERROU</small><b id="rBom">0 / 0</b></div>
+  </div>
+  <div class="sub" id="rRecorde"></div>
+  <div class="linha-botoes">
+    <button class="botao" id="botaoDeNovo">DE NOVO</button>
+    <button class="botao sec" id="botaoMenuFim">MENU</button>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+//  BATIDA NEON — jogo de ritmo com música synthwave gerada ao vivo
+// =====================================================================
+
+// ----- Músicas: tudo é composto aqui, nota por nota -----
+// acordes: graus da escala menor (0 = tônica). tom: nota MIDI do baixo.
+const MUSICAS = [
+  { id: "drive", nome: "Neon Drive", bpm: 104, tom: 45, acordes: [0, 8, 10, 7], semente: 11, cor: "#ff2bd6" },
+  { id: "pulso", nome: "Pulso Noturno", bpm: 120, tom: 43, acordes: [0, 5, 8, 10], semente: 27, cor: "#00f0ff" },
+  { id: "hiper", nome: "Hiperespaço", bpm: 138, tom: 50, acordes: [0, 8, 3, 10], semente: 53, cor: "#ffe600" }
+];
+const ESCALA = [0, 2, 3, 5, 7, 8, 10];          // escala menor natural
+const CORES_PISTA = ["#ff2bd6", "#00f0ff", "#ffe600", "#39ff88"];
+const TECLAS_PISTA = ["D", "F", "J", "K"];
+const MAPA_TECLAS = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3, ArrowLeft: 0, ArrowDown: 1, ArrowUp: 2, ArrowRight: 3 };
+const JANELAS = [[0.045, "PERFEITO!", 300, "#39ff88"], [0.09, "ÓTIMO", 200, "#00f0ff"], [0.15, "BOM", 100, "#ffe600"]];
+
+let musicaEscolhida = 0, difEscolhida = "normal";
+let velocidadeNotas = 1.4, atrasoMs = 0;
+try {
+  velocidadeNotas = Number(localStorage.getItem("batida_vel")) || 1.4;
+  atrasoMs = Number(localStorage.getItem("batida_atraso")) || 0;
+} catch (e) {}
+
+// Gerador de números aleatórios com semente (a música sai sempre igual)
+function aleatorio(semente) {
+  return () => {
+    semente |= 0; semente = semente + 0x6D2B79F5 | 0;
+    let t = Math.imul(semente ^ semente >>> 15, 1 | semente);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// ----- Composição: gera os eventos de som e as notas do jogo -----
+// Seções (em compassos): intro 4, A 8, B 8 (com melodia), A' 4, final 2
+function compor(m, dif) {
+  const rnd = aleatorio(m.semente);
+  const seg16 = 60 / m.bpm / 4;                  // duração de uma semicolcheia
+  const eventos = [], notas = [];
+  const TOTAL = 26;
+  const secao = b => b < 4 ? "intro" : b < 12 ? "A" : b < 20 ? "B" : b < 24 ? "A2" : "fim";
+  const ritmos = [[0, 3, 6, 8, 11, 14], [0, 2, 4, 7, 10, 12], [0, 4, 6, 8, 12, 14], [0, 3, 8, 10, 12], [0, 2, 6, 8, 10, 14]];
+  const prioMax = { facil: 2, normal: 3, dificil: 4 }[dif];
+
+  let grauMelodia = 0;
+  for (let b = 0; b < TOTAL; b++) {
+    const s = secao(b);
+    const raiz = m.acordes[b % 4];
+    const menor = [0, 5, 7].includes(raiz);
+    const triade = menor ? [0, 3, 7] : [0, 4, 7];
+    const baixo = m.tom + raiz - (raiz > 6 ? 12 : 0);
+
+    // melodia deste compasso (só na seção B)
+    const melodia = {};
+    if (s === "B") {
+      const ritmo = ritmos[Math.floor(rnd() * ritmos.length)];
+      ritmo.forEach((passo, k) => {
+        if (k === 0) {
+          // começa numa nota do acorde
+          const alvo = ESCALA.indexOf((raiz + triade[Math.floor(rnd() * 3)]) % 12);
+          grauMelodia = alvo >= 0 ? alvo + 7 : grauMelodia;
+        } else {
+          grauMelodia += [-2, -1, -1, 1, 1, 2][Math.floor(rnd() * 6)];
+          grauMelodia = Math.max(5, Math.min(13, grauMelodia));
+        }
+        const oitava = Math.floor(grauMelodia / 7);
+        const nota = m.tom + 24 + ESCALA[grauMelodia % 7] + 12 * (oitava - 1);
+        const prox = ritmo[k + 1] !== undefined ? ritmo[k + 1] : 16;
+        melodia[passo] = { nota, dur: (prox - passo) * seg16 * 0.9, grau: grauMelodia };
+      });
+    }
+
+    for (let p = 0; p < 16; p++) {
+      const t = (b * 16 + p) * seg16;
+      if (s === "fim" && b === TOTAL - 1 && p > 0) break;
+      // bateria
+      const bumbo = p % 4 === 0 && !(s === "intro" && b < 2 && p !== 0);
+      if (bumbo) eventos.push({ t, tipo: "bumbo" });
+      if (s !== "intro" && s !== "fim" && (p === 4 || p === 12)) eventos.push({ t, tipo: "caixa" });
+      if (p % 4 === 2 || (s === "B" && p % 2 === 1 && m.bpm < 130)) eventos.push({ t, tipo: "chimbal", forte: p % 4 === 2 });
+      // baixo pulsando em colcheias (oitava alternada)
+      if (p % 2 === 0) eventos.push({ t, tipo: "baixo", nota: baixo + (p % 4 === 2 ? 12 : 0), dur: seg16 * 1.8 });
+      // arpejo
+      if ((s === "A" || s === "B" || s === "A2") && p % 2 === 1) {
+        const tons = [triade[0], triade[1], triade[2], 12];
+        eventos.push({ t, tipo: "arpejo", nota: m.tom + 24 + raiz + tons[((p - 1) / 2) % 4], dur: seg16 * 1.5 });
+      }
+      if (melodia[p]) eventos.push({ t, tipo: "melodia", nota: melodia[p].nota, dur: melodia[p].dur });
+      if (s === "fim" && b === TOTAL - 1 && p === 0) eventos.push({ t, tipo: "prato" });
+
+      // ----- notas do jogo -----
+      let prio = 0, pista = -1;
+      if (p === 0 || p === 8) { prio = 1; pista = p === 0 ? (b % 2 ? 3 : 0) : (b % 2 ? 0 : 3); }
+      else if ((p === 4 || p === 12) && s !== "intro" && s !== "fim") { prio = 2; pista = p === 4 ? 1 : 2; }
+      if (melodia[p]) {
+        const pr = p % 2 === 0 ? 3 : 4;
+        if (!prio || prio > 2) { prio = Math.min(prio || pr, pr); }
+        pista = melodia[p].grau % 4;          // a coluna acompanha a altura da nota
+      } else if ((s === "A" || s === "A2") && p % 4 === 2) {
+        prio = prio || 3;
+        if (pista < 0) pista = (b + p / 2) % 4;
+      }
+      // notas extras que só entram no Difícil (semicolcheias do arpejo e contratempos)
+      if (!prio && (s === "A" || s === "A2" || s === "B") && p % 4 === 3) { prio = 4; pista = (b * 3 + p) % 4; }
+      if (!prio && s === "B" && p % 4 === 2) { prio = 4; pista = (b + p) % 4; }
+      if (s === "intro" || s === "fim") { if (prio !== 1) prio = 0; }
+      if (prio && prio <= prioMax && pista >= 0) notas.push({ t, pista });
+      // no difícil, notas duplas no começo de cada compasso da seção B
+      if (dif === "dificil" && s === "B" && p === 0) notas.push({ t, pista: (pista + 2) % 4 });
+    }
+  }
+
+  // nunca duas notas na mesma coluna muito perto
+  notas.sort((a, b) => a.t - b.t);
+  const ultimaNaPista = [-9, -9, -9, -9];
+  const limpas = [];
+  for (const n of notas) {
+    let tent = 0;
+    while (tent < 4 && (n.t - ultimaNaPista[n.pista] < 0.11 || limpas.some(x => x.t === n.t && x.pista === n.pista))) { n.pista = (n.pista + 1) % 4; tent++; }
+    if (tent < 4) { ultimaNaPista[n.pista] = n.t; limpas.push(n); }
+  }
+  eventos.sort((a, b) => a.t - b.t);
+  return { eventos, notas: limpas, duracao: TOTAL * 16 * seg16 - 15 * seg16 + 1.5, seg16 };
+}
+
+// ----- Sintetizador (Web Audio) -----
+let audio = null, saida = null, ruido = null;
+function ctxAudio() {
+  if (!audio) {
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    const comp = audio.createDynamicsCompressor();
+    saida = audio.createGain();
+    saida.gain.value = 0.7;
+    saida.connect(comp).connect(audio.destination);
+    ruido = audio.createBuffer(1, audio.sampleRate, audio.sampleRate);
+    const d = ruido.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (audio.state === "suspended") audio.resume();
+  return audio;
+}
+const freq = m => 440 * Math.pow(2, (m - 69) / 12);
+
+function env(g, t, pico, dur, ataque = 0.005) {
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(pico, t + ataque);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+}
+
+function tocar(ev, t) {
+  const a = audio;
+  if (ev.tipo === "bumbo") {
+    const o = a.createOscillator(), g = a.createGain();
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+    env(g, t, 0.9, 0.28, 0.002);
+    o.connect(g).connect(saida); o.start(t); o.stop(t + 0.3);
+  } else if (ev.tipo === "caixa" || ev.tipo === "chimbal" || ev.tipo === "prato") {
+    const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    s.buffer = ruido;
+    f.type = ev.tipo === "caixa" ? "bandpass" : "highpass";
+    f.frequency.value = ev.tipo === "caixa" ? 1800 : ev.tipo === "prato" ? 5000 : 8000;
+    const dur = ev.tipo === "caixa" ? 0.16 : ev.tipo === "prato" ? 1.4 : 0.045;
+    env(g, t, ev.tipo === "caixa" ? 0.45 : ev.tipo === "prato" ? 0.25 : (ev.forte ? 0.14 : 0.07), dur, 0.002);
+    s.connect(f).connect(g).connect(saida); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
+    if (ev.tipo === "caixa") {
+      const o = a.createOscillator(), g2 = a.createGain();
+      o.type = "triangle"; o.frequency.value = 210;
+      env(g2, t, 0.2, 0.08, 0.002);
+      o.connect(g2).connect(saida); o.start(t); o.stop(t + 0.1);
+    }
+  } else {
+    const o = a.createOscillator(), f = a.createBiquadFilter(), g = a.createGain();
+    o.frequency.value = freq(ev.nota);
+    if (ev.tipo === "baixo") {
+      o.type = "sawtooth"; f.type = "lowpass"; f.Q.value = 6;
+      f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(180, t + ev.dur);
+      env(g, t, 0.22, ev.dur);
+    } else if (ev.tipo === "arpejo") {
+      o.type = "square"; f.type = "lowpass"; f.frequency.value = 2400;
+      env(g, t, 0.05, ev.dur);
+    } else {
+      o.type = "sawtooth"; f.type = "lowpass"; f.frequency.value = 3200;
+      const o2 = a.createOscillator();      // segunda voz levemente desafinada (som "gordo")
+      o2.type = "sawtooth"; o2.frequency.value = freq(ev.nota) * 1.006;
+      o2.connect(f); o2.start(t); o2.stop(t + ev.dur + 0.05);
+      env(g, t, 0.09, ev.dur, 0.015);
+    }
+    o.connect(f).connect(g).connect(saida); o.start(t); o.stop(t + ev.dur + 0.05);
+  }
+}
+
+// ----- Estado do jogo -----
+let estado = "menu";        // menu | jogando | pausado | fim
+let musica, composicao, notas, inicioMusica = 0, proximoEvento = 0;
+let pontos = 0, combo = 0, maiorCombo = 0, contagem = { perfeito: 0, otimo: 0, bom: 0, errou: 0 };
+let julgamento = null, particulas = [], brilhoPista = [0, 0, 0, 0], pressionada = [false, false, false, false];
+
+const tempoAtual = () => audio.currentTime - inicioMusica - atrasoMs / 1000;
+
+function iniciar() {
+  ctxAudio();
+  musica = MUSICAS[musicaEscolhida];
+  composicao = compor(musica, difEscolhida);
+  notas = composicao.notas.map(n => ({ ...n, julgada: false }));
+  inicioMusica = audio.currentTime + 2.0; // 2 segundos de preparação
+  proximoEvento = 0;
+  pontos = 0; combo = 0; maiorCombo = 0;
+  contagem = { perfeito: 0, otimo: 0, bom: 0, errou: 0 };
+  julgamento = null; particulas = [];
+  estado = "jogando";
+  mostrarTela(null);
+}
+
+// agenda os sons um pouquinho à frente (sem engasgar)
+function agendarSons() {
+  const ate = audio.currentTime + 0.15;
+  const evs = composicao.eventos;
+  while (proximoEvento < evs.length && inicioMusica + evs[proximoEvento].t < ate) {
+    const ev = evs[proximoEvento++];
+    tocar(ev, Math.max(audio.currentTime, inicioMusica + ev.t));
+  }
+}
+
+function apertar(pista) {
+  if (estado !== "jogando") return;
+  pressionada[pista] = true;
+  brilhoPista[pista] = 1;
+  const agora = tempoAtual();
+  let melhor = null, menorDif = Infinity;
+  for (const n of notas) {
+    if (n.julgada || n.pista !== pista) continue;
+    const d = Math.abs(n.t - agora);
+    if (d < menorDif) { menorDif = d; melhor = n; }
+    if (n.t - agora > 0.3) break;
+  }
+  if (!melhor || menorDif > JANELAS[2][0]) return; // apertou fora de hora: sem castigo
+  melhor.julgada = true;
+  const [, texto, valor, cor] = JANELAS.find(j => menorDif <= j[0]);
+  combo++;
+  maiorCombo = Math.max(maiorCombo, combo);
+  const mult = Math.min(4, 1 + Math.floor(combo / 10));
+  pontos += valor * mult;
+  contagem[texto === "PERFEITO!" ? "perfeito" : texto === "ÓTIMO" ? "otimo" : "bom"]++;
+  julgamento = { texto, cor, vida: 0.5 };
+  explodir(pista, cor);
+}
+
+function soltar(pista) { pressionada[pista] = false; }
+
+function errou() {
+  combo = 0;
+  contagem.errou++;
+  julgamento = { texto: "ERROU", cor: "#ff4060", vida: 0.5 };
+}
+
+// ----- Desenho -----
+const tela = document.getElementById("tela");
+const ctx = tela.getContext("2d");
+let L, A, horizonte, linhaAcerto, largBase, centroX;
+function redimensionar() {
+  L = tela.width = innerWidth;
+  A = tela.height = innerHeight;
+  horizonte = A * 0.28;
+  linhaAcerto = A * 0.84;
+  largBase = Math.min(L * 0.92, 560);
+  centroX = L / 2;
+}
+addEventListener("resize", redimensionar);
+redimensionar();
+
+// perspectiva: z = 0 na linha de acerto, z = 1 no horizonte
+function projetar(z) {
+  const s = 1 / (1 + z * 3);
+  const y = horizonte + (linhaAcerto - horizonte) * (s - 0.25) / 0.75;
+  return { s, y };
+}
+const xPista = (pista, s) => centroX + (pista - 1.5) * (largBase / 4) * s;
+
+function explodir(pista, cor) {
+  for (let i = 0; i < 14; i++) {
+    const ang = Math.random() * Math.PI * 2, v = 120 + Math.random() * 220;
+    particulas.push({ x: xPista(pista, 1), y: linhaAcerto, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v - 120, vida: 0.45, cor });
+  }
+}
+
+function desenhar(dt) {
+  const agora = estado === "menu" ? performance.now() / 1000 : tempoAtual();
+  // pulsa a cada tempo da música (o bumbo cai em todos os tempos)
+  const tempoBatida = musica ? 60 / musica.bpm : 0.5;
+  const pulso = estado === "menu" || agora < 0 ? 0.3 : Math.exp(-(agora % tempoBatida) * 7);
+
+  // céu
+  const g = ctx.createLinearGradient(0, 0, 0, A);
+  g.addColorStop(0, "#08021e");
+  g.addColorStop(0.28, "#5a1270");
+  g.addColorStop(0.29, "#16062e");
+  g.addColorStop(1, "#05010f");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, L, A);
+
+  // sol listrado que pulsa com a batida
+  const raioSol = Math.min(L, A) * (0.17 + pulso * 0.012);
+  const gs = ctx.createLinearGradient(0, horizonte - raioSol, 0, horizonte);
+  gs.addColorStop(0, "#ffe600");
+  gs.addColorStop(1, "#ff2bd6");
+  ctx.save();
+  ctx.shadowBlur = 40 + pulso * 40;
+  ctx.shadowColor = "#ff2bd6";
+  ctx.fillStyle = gs;
+  ctx.beginPath();
+  ctx.arc(centroX, horizonte, raioSol, Math.PI, 0);
+  ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = "#5a1270";
+  for (let k = 0; k < 6; k++) ctx.fillRect(centroX - raioSol, horizonte - raioSol * 0.5 + k * raioSol * 0.09 + k * k * 1.2, raioSol * 2, 2 + k);
+
+  // chão em grade se movendo
+  ctx.strokeStyle = `rgba(255,43,214,${0.25 + pulso * 0.3})`;
+  ctx.lineWidth = 1;
+  // linhas horizontais vindo do horizonte para perto (sensação de movimento)
+  const deslocamento = (agora * velocidadeNotas * 0.55) % 1;
+  for (let k = 0; k < 12; k++) {
+    const z = (k / 12 - deslocamento / 12 + 1) % 1;
+    const { y } = projetar(z);
+    ctx.globalAlpha = 1 - z;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(L, y); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  for (let k = -8; k <= 8; k++) {
+    ctx.beginPath();
+    ctx.moveTo(centroX + k * (largBase / 4) * 0.25 * 1.6, horizonte);
+    ctx.lineTo(centroX + k * (largBase / 4) * 1.6 * 1.25, A);
+    ctx.stroke();
+  }
+
+  // estrada das 4 colunas
+  const topo = projetar(1), base = projetar(-0.08);
+  ctx.fillStyle = "rgba(10, 4, 30, 0.85)";
+  ctx.beginPath();
+  ctx.moveTo(xPista(-0.5, topo.s), topo.y);
+  ctx.lineTo(xPista(3.5, topo.s), topo.y);
+  ctx.lineTo(xPista(3.5, base.s), base.y);
+  ctx.lineTo(xPista(-0.5, base.s), base.y);
+  ctx.fill();
+  for (let p = 0; p < 4; p++) {
+    brilhoPista[p] = Math.max(pressionada[p] ? 0.35 : 0, brilhoPista[p] - dt * 3);
+    if (brilhoPista[p] > 0) {
+      const gr = ctx.createLinearGradient(0, linhaAcerto, 0, topo.y);
+      gr.addColorStop(0, CORES_PISTA[p] + "88");
+      gr.addColorStop(1, CORES_PISTA[p] + "00");
+      ctx.globalAlpha = brilhoPista[p];
+      ctx.fillStyle = gr;
+      ctx.beginPath();
+      ctx.moveTo(xPista(p - 0.5, topo.s), topo.y);
+      ctx.lineTo(xPista(p + 0.5, topo.s), topo.y);
+      ctx.lineTo(xPista(p + 0.5, base.s), base.y);
+      ctx.lineTo(xPista(p - 0.5, base.s), base.y);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+  ctx.lineWidth = 2;
+  for (let p = 0; p <= 4; p++) {
+    ctx.strokeStyle = p === 0 || p === 4 ? "#00f0ff" : "rgba(255,255,255,0.18)";
+    ctx.shadowBlur = p === 0 || p === 4 ? 12 : 0;
+    ctx.shadowColor = "#00f0ff";
+    ctx.beginPath();
+    ctx.moveTo(xPista(p - 0.5, topo.s), topo.y);
+    ctx.lineTo(xPista(p - 0.5, base.s), base.y);
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+
+  // alvos na linha de acerto
+  for (let p = 0; p < 4; p++) {
+    const x = xPista(p, 1), w = largBase / 4 * 0.8;
+    ctx.strokeStyle = CORES_PISTA[p];
+    ctx.lineWidth = pressionada[p] ? 5 : 3;
+    ctx.shadowBlur = 14 + (pressionada[p] ? 14 : 0);
+    ctx.shadowColor = CORES_PISTA[p];
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x - w / 2, linhaAcerto - 12, w, 24, 10) : ctx.rect(x - w / 2, linhaAcerto - 12, w, 24);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.font = "bold 14px 'Press Start 2P', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(TECLAS_PISTA[p], x, linhaAcerto + 46);
+  }
+
+  if (estado === "menu" || !notas) return;
+
+  // notas caindo
+  const tempoVisivel = 1.9 / velocidadeNotas;
+  for (const n of notas) {
+    if (n.julgada) continue;
+    const z = (n.t - agora) / tempoVisivel;
+    if (z > 1) break;
+    if (z < -0.12) continue;
+    const { s, y } = projetar(z);
+    const x = xPista(n.pista, s), w = largBase / 4 * 0.78 * s, h = Math.max(6, 22 * s);
+    ctx.fillStyle = CORES_PISTA[n.pista];
+    ctx.shadowBlur = 18 * s;
+    ctx.shadowColor = CORES_PISTA[n.pista];
+    ctx.globalAlpha = Math.min(1, (1 - z) * 3);
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x - w / 2, y - h / 2, w, h, 6 * s) : ctx.rect(x - w / 2, y - h / 2, w, h);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.fillRect(x - w / 2 + 4 * s, y - h / 2 + 3 * s, w - 8 * s, Math.max(1, 3 * s));
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+
+  // partículas dos acertos
+  particulas.forEach(pt => {
+    pt.vida -= dt; pt.vy += 500 * dt;
+    pt.x += pt.vx * dt; pt.y += pt.vy * dt;
+    ctx.globalAlpha = Math.max(0, pt.vida / 0.45);
+    ctx.fillStyle = pt.cor;
+    ctx.fillRect(pt.x - 3, pt.y - 3, 6, 6);
+  });
+  particulas = particulas.filter(pt => pt.vida > 0);
+  ctx.globalAlpha = 1;
+
+  // julgamento e combo
+  ctx.textAlign = "center";
+  if (julgamento && julgamento.vida > 0) {
+    julgamento.vida -= dt;
+    ctx.globalAlpha = Math.min(1, julgamento.vida * 4);
+    ctx.fillStyle = julgamento.cor;
+    ctx.shadowBlur = 16; ctx.shadowColor = julgamento.cor;
+    const tam = 22 + (0.5 - julgamento.vida) * 10;
+    ctx.font = `${tam}px 'Press Start 2P', monospace`;
+    ctx.fillText(julgamento.texto, centroX, linhaAcerto - 90);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+  if (combo >= 5) {
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = `${36 + pulso * 6}px 'Press Start 2P', monospace`;
+    ctx.fillText(combo, centroX, A * 0.46);
+    ctx.font = "11px 'Press Start 2P', monospace";
+    ctx.fillStyle = "#ffe600";
+    ctx.fillText(`COMBO  x${Math.min(4, 1 + Math.floor(combo / 10))}`, centroX, A * 0.46 + 26);
+  }
+
+  // placar e progresso
+  ctx.textAlign = "left";
+  ctx.font = "16px 'Press Start 2P', monospace";
+  ctx.fillStyle = "#fff";
+  ctx.fillText(String(pontos).padStart(7, "0"), 16, 34);
+  ctx.font = "10px 'Press Start 2P', monospace";
+  ctx.fillStyle = musica.cor;
+  ctx.fillText(musica.nome.toUpperCase(), 16, 54);
+  const feitas = contagem.perfeito + contagem.otimo + contagem.bom;
+  const julgadas = feitas + contagem.errou;
+  const precisao = julgadas ? (contagem.perfeito + contagem.otimo * 0.7 + contagem.bom * 0.4) / julgadas : 1;
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#b3a6e0";
+  ctx.fillText(`${(precisao * 100).toFixed(1)}%`, L - 16, 34);
+  const prog = Math.max(0, Math.min(1, agora / composicao.duracao));
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(0, 0, L, 5);
+  ctx.fillStyle = musica.cor;
+  ctx.fillRect(0, 0, L * prog, 5);
+
+  // contagem antes de começar
+  if (agora < 0) {
+    ctx.textAlign = "center";
+    ctx.font = "42px 'Press Start 2P', monospace";
+    ctx.fillStyle = "#ffe600";
+    ctx.shadowBlur = 20; ctx.shadowColor = "#ffe600";
+    ctx.fillText(agora < -1 ? "PRONTO?" : "VAI!", centroX, A * 0.46);
+    ctx.shadowBlur = 0;
+  }
+}
+
+// ----- Laço -----
+let ultimo = performance.now();
+function laco(t) {
+  requestAnimationFrame(laco);
+  const dt = Math.min(0.05, (t - ultimo) / 1000);
+  ultimo = t;
+  if (estado === "jogando") {
+    agendarSons();
+    const agora = tempoAtual();
+    for (const n of notas) {
+      if (n.t > agora - JANELAS[2][0]) break;
+      if (!n.julgada) { n.julgada = true; errou(); }
+    }
+    if (agora > composicao.duracao) terminar();
+  }
+  desenhar(estado === "pausado" ? 0 : dt);
+}
+
+function terminar() {
+  estado = "fim";
+  const total = notas.length;
+  const precisao = total ? (contagem.perfeito + contagem.otimo * 0.7 + contagem.bom * 0.4) / total : 0;
+  const nota = precisao >= 0.95 ? "S" : precisao >= 0.88 ? "A" : precisao >= 0.75 ? "B" : precisao >= 0.6 ? "C" : "D";
+  const corNota = { S: "#ffe600", A: "#39ff88", B: "#00f0ff", C: "#ff2bd6", D: "#ff4060" }[nota];
+  document.getElementById("nomeMusicaFim").textContent = `${musica.nome.toUpperCase()} · ${difEscolhida.toUpperCase()}`;
+  const el = document.getElementById("notaFinal");
+  el.textContent = nota;
+  el.style.color = corNota;
+  el.style.textShadow = `0 0 24px ${corNota}`;
+  document.getElementById("rPontos").textContent = pontos;
+  document.getElementById("rPrecisao").textContent = (precisao * 100).toFixed(1) + "%";
+  document.getElementById("rCombo").textContent = maiorCombo;
+  document.getElementById("rNotas").textContent = total;
+  document.getElementById("rPerfeito").textContent = `${contagem.perfeito} / ${contagem.otimo}`;
+  document.getElementById("rBom").textContent = `${contagem.bom} / ${contagem.errou}`;
+
+  const chave = `fliperama_batida_${musica.id}_${difEscolhida}`;
+  let texto = "";
+  try {
+    const antigo = Number(localStorage.getItem(chave)) || 0;
+    if (pontos > antigo) { localStorage.setItem(chave, pontos); texto = "🏆 NOVO RECORDE NESTA MÚSICA!"; }
+    else texto = `Recorde: ${antigo}`;
+    if (pontos > (Number(localStorage.getItem("fliperama_batida")) || 0)) localStorage.setItem("fliperama_batida", pontos);
+  } catch (e) {}
+  document.getElementById("rRecorde").textContent = texto;
+  mostrarTela("fim");
+}
+
+function mostrarTela(id) {
+  ["menu", "pausa", "fim"].forEach(t => document.getElementById(t).classList.toggle("escondida", t !== id));
+}
+
+// ----- Menu -----
+function desenharMusicas() {
+  const caixa = document.getElementById("opcoesMusica");
+  caixa.innerHTML = MUSICAS.map((m, i) => {
+    let rec = 0;
+    try { rec = Number(localStorage.getItem(`fliperama_batida_${m.id}_${difEscolhida}`)) || 0; } catch (e) {}
+    return `<button class="opcao musica ${i === musicaEscolhida ? "selecionada" : ""}" data-i="${i}">
+      <span class="bpm" style="color:${m.cor}">${m.bpm} BPM</span>${m.nome}
+      <span class="rec">${rec ? "🏆 " + rec : ""}</span></button>`;
+  }).join("");
+  caixa.querySelectorAll(".musica").forEach(b => b.addEventListener("click", () => {
+    musicaEscolhida = Number(b.dataset.i);
+    desenharMusicas();
+    previa();
+  }));
+}
+
+// toca 1 compasso da música escolhida como prévia
+function previa() {
+  ctxAudio();
+  const m = MUSICAS[musicaEscolhida];
+  const c = compor(m, "facil");
+  const inicio = audio.currentTime + 0.05, comeco = c.seg16 * 16 * 12; // um pedaço da parte B
+  c.eventos.filter(e => e.t >= comeco && e.t < comeco + c.seg16 * 32).forEach(e => tocar(e, inicio + e.t - comeco));
+}
+
+document.querySelectorAll("#opcoesDif .opcao").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("#opcoesDif .opcao").forEach(x => x.classList.remove("selecionada"));
+  b.classList.add("selecionada");
+  difEscolhida = b.dataset.dif;
+  desenharMusicas();
+}));
+
+const inputVel = document.getElementById("velNotas"), inputAtraso = document.getElementById("atraso");
+inputVel.value = velocidadeNotas;
+inputAtraso.value = atrasoMs;
+function atualizarAjustes() {
+  velocidadeNotas = Number(inputVel.value);
+  atrasoMs = Number(inputAtraso.value);
+  document.getElementById("valorVel").textContent = velocidadeNotas.toFixed(1) + "x";
+  document.getElementById("valorAtraso").textContent = (atrasoMs > 0 ? "+" : "") + atrasoMs + " ms";
+  try { localStorage.setItem("batida_vel", velocidadeNotas); localStorage.setItem("batida_atraso", atrasoMs); } catch (e) {}
+}
+inputVel.addEventListener("input", atualizarAjustes);
+inputAtraso.addEventListener("input", atualizarAjustes);
+atualizarAjustes();
+
+// ----- Controles -----
+document.addEventListener("keydown", e => {
+  if (e.repeat) return;
+  const p = MAPA_TECLAS[e.code];
+  if (p !== undefined) { e.preventDefault(); apertar(p); }
+  if (e.code === "KeyP") {
+    if (estado === "jogando") { estado = "pausado"; audio.suspend(); mostrarTela("pausa"); }
+    else if (estado === "pausado") continuar();
+  }
+});
+document.addEventListener("keyup", e => { const p = MAPA_TECLAS[e.code]; if (p !== undefined) soltar(p); });
+
+// toque / clique: a coluna é escolhida pela posição horizontal
+function pistaDoX(x) {
+  const rel = (x - centroX) / (largBase / 4) + 2;
+  return Math.max(0, Math.min(3, Math.floor(rel)));
+}
+const toques = {};
+tela.addEventListener("pointerdown", e => {
+  if (estado !== "jogando") return;
+  const p = pistaDoX(e.clientX);
+  toques[e.pointerId] = p;
+  apertar(p);
+});
+["pointerup", "pointercancel", "pointerleave"].forEach(ev => tela.addEventListener(ev, e => {
+  if (toques[e.pointerId] !== undefined) { soltar(toques[e.pointerId]); delete toques[e.pointerId]; }
+}));
+
+function continuar() {
+  estado = "jogando";
+  mostrarTela(null);
+  audio.resume();
+}
+addEventListener("blur", () => { if (estado === "jogando") { estado = "pausado"; audio.suspend(); mostrarTela("pausa"); } });
+
+document.getElementById("botaoJogar").addEventListener("click", e => { iniciar(); e.currentTarget.blur(); });
+document.getElementById("botaoDeNovo").addEventListener("click", e => { iniciar(); e.currentTarget.blur(); });
+document.getElementById("botaoContinuar").addEventListener("click", continuar);
+function irMenu() {
+  if (audio && audio.state === "suspended") audio.resume();
+  estado = "menu";
+  notas = null;
+  desenharMusicas();
+  mostrarTela("menu");
+}
+document.getElementById("botaoMenuPausa").addEventListener("click", () => {
+  // corta o som que já estava agendado
+  if (saida) { saida.disconnect(); const comp = audio.createDynamicsCompressor(); saida = audio.createGain(); saida.gain.value = 0.7; saida.connect(comp).connect(audio.destination); }
+  irMenu();
+});
+document.getElementById("botaoMenuFim").addEventListener("click", irMenu);
+
+desenharMusicas();
+requestAnimationFrame(laco);
+</script>
+</body>
+</html>
