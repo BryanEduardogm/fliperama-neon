@@ -238,6 +238,21 @@
 
   #placar { left: 50%; top: 14px; transform: translateX(-50%); text-align: center; font-size: 0.85rem; letter-spacing: 1px; }
   #placar b { color: var(--destaque); }
+  #placarOnline { left: 50%; top: 14px; transform: translateX(-50%); text-align: center; font-size: 0.95rem; letter-spacing: 1px; }
+  #placarOnline b { color: var(--destaque); font-size: 1.15rem; }
+  #placarOnline .amigo { color: #6fb6ff; }
+
+  /* ===== X1 online ===== */
+  .caixa-online { border: 1px solid var(--borda); border-radius: 10px; padding: 14px 18px; background: rgba(0, 0, 0, 0.25); max-width: 660px; width: 100%; }
+  .linha-online { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+  .linha-online .botao { padding: 10px 22px; font-size: 0.9rem; }
+  #campoCodigo { width: 130px; padding: 10px; font-size: 1.1rem; font-weight: 900; letter-spacing: 4px; text-align: center; text-transform: uppercase;
+    border-radius: 8px; border: 2px solid var(--borda); background: #0a0c0f; color: var(--destaque); user-select: text; }
+  #campoCodigo:focus { outline: none; border-color: var(--destaque); }
+  #codigoSala { font-size: 1.8rem; letter-spacing: 6px; color: var(--destaque); }
+  #statusOnline { color: var(--suave); font-size: 0.8rem; letter-spacing: 2px; width: 100%; text-align: center; }
+  .dica-online { font-size: 0.75rem; color: var(--suave); text-align: center; margin-top: 10px; line-height: 1.5; }
+  #erroOnline { color: var(--perigo); font-size: 0.8rem; text-align: center; margin-top: 6px; }
 
   #feed { position: absolute; right: 20px; top: 20px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
   #feed div { background: rgba(10, 12, 15, 0.7); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; }
@@ -382,6 +397,23 @@
 
   <button class="botao" id="botaoJogar">JOGAR</button>
 
+  <div class="secao caixa-online">
+    <h2>🌐 X1 ONLINE COM UM AMIGO</h2>
+    <div class="linha-online" id="onlineInicio">
+      <button class="botao secundario" id="botaoCriarSala">CRIAR SALA</button>
+      <input id="campoCodigo" maxlength="5" placeholder="CÓDIGO" autocomplete="off" aria-label="Código da sala">
+      <button class="botao secundario" id="botaoEntrarSala">ENTRAR</button>
+    </div>
+    <div class="linha-online" id="onlineEspera" style="display:none">
+      <span>CÓDIGO DA SALA:</span><b id="codigoSala"></b>
+      <button class="botao secundario" id="botaoCopiar">📋 COPIAR</button>
+      <button class="botao secundario" id="botaoCancelarSala">CANCELAR</button>
+      <span id="statusOnline"></span>
+    </div>
+    <p class="dica-online">Quem cria a sala escolhe o mapa (lá em cima). Cada um joga com a arma que escolheu.<br>Mande o código para seu amigo. Quem fizer <b>10 abates</b> primeiro vence.</p>
+    <div id="erroOnline"></div>
+  </div>
+
   <div class="controles-lista">
     <b>W A S D</b> andar &nbsp; <b>Mouse</b> mirar &nbsp; <b>Clique</b> atirar &nbsp; <b>Botão direito</b> zoom<br>
     <b>R</b> recarregar &nbsp; <b>1</b> pistola <b>2</b> fuzil <b>3</b> SMG <b>4</b> escopeta <b>5</b> sniper &nbsp; <b>Q</b> faca &nbsp; <b>E</b> granada &nbsp; <b>Espaço</b> pular &nbsp; <b>B</b> arsenal (mais armas) &nbsp; <b>Shift</b> correr &nbsp; <b>C</b> agachar &nbsp; <b>P</b> pausar
@@ -436,6 +468,7 @@
   </div>
   <div id="acerto"></div>
   <div class="caixa-hud" id="placar"><span id="nomeDificuldade"></span> &nbsp;·&nbsp; RODADA <b id="rodada">1</b> &nbsp;·&nbsp; INIMIGOS <b id="restantes">0</b> &nbsp;·&nbsp; ABATES <b id="abates">0</b></div>
+  <div class="caixa-hud" id="placarOnline" style="display:none">X1 ONLINE &nbsp;·&nbsp; VOCÊ <b id="pontosEu">0</b> × <b class="amigo" id="pontosAmigo">0</b> AMIGO &nbsp;·&nbsp; ATÉ 10</div>
   <div id="feed"></div>
   <div id="aviso-centro"></div>
   <div id="postura"></div>
@@ -884,17 +917,20 @@ function ferirBarril(m, dano) {
   const b = m.userData.barril;
   if (b.explodido) return;
   b.vida -= dano;
-  if (b.vida <= 0) explodirBarril(m);
+  if (b.vida <= 0) {
+    explodirBarril(m);
+    if (rede.ativo) enviar({ t: "barril", i: barris.indexOf(m) });
+  }
 }
 
-function explodirBarril(m) {
+function explodirBarril(m, dono = "eu") {
   const b = m.userData.barril;
   if (b.explodido || !m.parent) return;
   b.explodido = true;
   cena.remove(m);
   solidos = solidos.filter(x => x !== m);
   colisores = colisores.filter(c => c !== b.colisor);
-  explodir(m.position.clone(), "🛢️", 1.2);
+  explodir(m.position.clone(), "🛢️", 1.2, dono);
 }
 
 function prepararCena(corCeu, corNevoa, nevoaPerto, nevoaLonge, texChao, repChao) {
@@ -1832,7 +1868,10 @@ const TIPOS_BOT = {
   atirador: { nome: "Atirador", vida: 80, velocidade: 0.8, dano: 2.3, precisao: 1.3, cadencia: 2.8,
               distancia: [22, 60], visao: 1.6, escala: 1, camisa: 0x4a5a32, colete: 0x36452a, som: "scout", rastro: 0xff5040 },
   pesado:   { nome: "Pesado", vida: 260, velocidade: 0.62, dano: 0.8, precisao: 0.75, cadencia: 0.45,
-              distancia: [4, 14], visao: 1, escala: 1.18, camisa: 0x3a3d42, colete: 0x1f2226, som: "fuzil", rastro: 0xffb060 }
+              distancia: [4, 14], visao: 1, escala: 1.18, camisa: 0x3a3d42, colete: 0x1f2226, som: "fuzil", rastro: 0xffb060 },
+  // boneco do amigo no X1 online (não é bot: quem controla é a outra pessoa)
+  rival:    { nome: "Amigo", vida: 100, velocidade: 1, dano: 1, precisao: 1, cadencia: 1,
+              distancia: [6, 18], visao: 1, escala: 1, camisa: 0x2a5aa8, colete: 0x1a2c4e, som: "fuzil", rastro: 0x8ac8ff }
 };
 
 // Sorteia o tipo de bot. Nas primeiras rodadas (e no Básico) os tipos fortes aparecem menos.
@@ -1888,7 +1927,7 @@ function criarBot(pos, nome, tipoId = "soldado") {
 
   parte(0.13, 0.13, 0.5, camisa, 0.24, 1.35, 0.2);
   parte(0.13, 0.13, 0.5, camisa, -0.18, 1.33, 0.25);
-  const comprimentoArma = { soldado: 0.65, corredor: 0.42, atirador: 1.0, pesado: 0.8 }[tipoId];
+  const comprimentoArma = { soldado: 0.65, corredor: 0.42, atirador: 1.0, pesado: 0.8, rival: 0.65 }[tipoId];
   parte(tipoId === "pesado" ? 0.12 : 0.07, 0.11, comprimentoArma, MAT_BOT.arma, 0.06, 1.38, 0.18 + comprimentoArma / 2);
   const boca = new THREE.Object3D();
   boca.position.set(0.06, 1.38, 0.2 + comprimentoArma);
@@ -1915,7 +1954,7 @@ function criarBot(pos, nome, tipoId = "soldado") {
 const jogador = {
   pos: new THREE.Vector3(), vy: 0, noChao: true,
   correndo: false, agachado: false, altura: 1.65,
-  yaw: 0, pitch: 0, vida: 100, abates: 0, headshots: 0
+  yaw: 0, pitch: 0, vida: 100, abates: 0, headshots: 0, morto: false
 };
 let estadoArmas = {};
 let armaAtual = "fuzil";
@@ -1955,8 +1994,11 @@ function iniciarRodada(novaPartida) {
   recarregando = 0; trocando = 0; spray = 0; mirando = false; atirando = false;
   granadas = 3; listaGranadas = []; tremor = 0;
 
-  // Bots nascem longe do jogador
-  const qtd = Math.min(dif.botsInicio + rodada - 1, dif.botsMax);
+  jogador.morto = false;
+  if (rede.ativo) prepararOnline();
+
+  // Bots nascem longe do jogador (no X1 online não tem bots)
+  const qtd = rede.ativo ? 0 : Math.min(dif.botsInicio + rodada - 1, dif.botsMax);
   const longe = pontosRota.filter(p => p.distanceTo(jogador.pos) > 38);
   const nomes = [...NOMES_BOTS].sort(() => Math.random() - 0.5);
   for (let i = 0; i < qtd; i++) {
@@ -1968,7 +2010,10 @@ function iniciarRodada(novaPartida) {
   trocarArma(armaAtual, true);
   document.getElementById("feed").innerHTML = "";
   document.getElementById("rodada").textContent = rodada;
-  mostrarAviso(`RODADA ${rodada} — ELIMINE ${qtd} INIMIGOS`, 2500);
+  if (rede.ativo) mostrarAviso("X1 ONLINE — PRIMEIRO A 10 ABATES VENCE", 3000);
+  else mostrarAviso(`RODADA ${rodada} — ELIMINE ${qtd} INIMIGOS`, 2500);
+  document.getElementById("placar").style.display = rede.ativo ? "none" : "";
+  document.getElementById("placarOnline").style.display = rede.ativo ? "" : "none";
   atualizarHUD();
 
   estado = "jogando";
@@ -2001,6 +2046,7 @@ function continuar() {
 }
 
 function irParaMenu() {
+  if (rede.ativo || rede.peer) sairOnline();
   estado = "menu";
   document.getElementById("hud").classList.add("escondido");
   mostrarTela("menu");
@@ -2063,7 +2109,7 @@ const raycaster = new THREE.Raycaster();
 function atirar() {
   const a = ARMAS[armaAtual], s = estadoArmas[armaAtual];
   const agora = performance.now();
-  if (estado !== "jogando") return;
+  if (estado !== "jogando" || jogador.morto) return;
   if (a.corpoACorpo) return golpear(false);
   if (recarregando > 0 || trocando > 0 || agora - ultimoTiro < a.cadencia) return;
   if (s.pente <= 0) {
@@ -2084,15 +2130,29 @@ function atirar() {
 
   const alvos = solidos.concat(chao);
   bots.forEach(b => { if (!b.morto) alvos.push(...b.partes); });
+  const rivalVivo = rede.ativo && rival && rival.recebeu && !rival.morto;
+  if (rivalVivo) alvos.push(...rival.partes);
 
   let acertou = false, matou = false;
+  let danoRival = 0, cabecaRival = false, fimRastro = null;
   for (let i = 0; i < a.chumbos; i++) {
     const dir = new THREE.Vector3((Math.random() - 0.5) * 2 * disp, (Math.random() - 0.5) * 2 * disp, -1)
       .normalize().applyQuaternion(camera.quaternion);
     raycaster.set(camera.position, dir);
     raycaster.far = a.alcance;
     const hit = raycaster.intersectObjects(alvos, false)[0];
+    if (!fimRastro) fimRastro = hit ? hit.point.clone() : camera.position.clone().addScaledVector(dir, a.alcance);
     if (!hit) continue;
+    if (hit.object.userData.rival) {
+      // acertou o amigo: soma o dano e avisa ele depois do tiro
+      let dano = a.dano;
+      if (armaAtual === "escopeta") dano *= Math.max(0.3, 1 - hit.distance / a.alcance);
+      if (hit.object.userData.cabeca) { dano *= 2.5; cabecaRival = true; }
+      danoRival += dano;
+      acertou = true;
+      particulas(hit.point, 0xa01010, 5);
+      continue;
+    }
     const bot = hit.object.userData.bot;
     if (bot && !bot.morto) {
       let dano = a.dano;
@@ -2111,6 +2171,11 @@ function atirar() {
   }
 
   if (acertou) mostrarAcerto(matou);
+  if (rede.ativo) {
+    const de = camera.position.clone().add(new THREE.Vector3(0, -0.25, 0));
+    enviar({ t: "tiro", de: de.toArray(), ate: fimRastro.toArray(), som: a.som || armaAtual });
+    if (danoRival > 0) enviar({ t: "dano", dano: danoRival, cabeca: cabecaRival, icone: "⌖" });
+  }
 
   // Bots próximos ouvem o tiro
   bots.forEach(b => {
@@ -2142,7 +2207,7 @@ let golpe = 0, golpeDuracao = 0, golpeForte = false;
 function golpear(forte) {
   const a = ARMAS.faca;
   const agora = performance.now();
-  if (estado !== "jogando" || trocando > 0 || agora - ultimoTiro < (forte ? a.cadenciaForte : a.cadencia)) return;
+  if (estado !== "jogando" || jogador.morto || trocando > 0 || agora - ultimoTiro < (forte ? a.cadenciaForte : a.cadencia)) return;
   ultimoTiro = agora;
   golpeForte = forte;
   golpeDuracao = golpe = forte ? 0.45 : 0.3;
@@ -2150,15 +2215,32 @@ function golpear(forte) {
 
   const alvos = solidos.slice();
   bots.forEach(b => { if (!b.morto) alvos.push(...b.partes); });
+  if (rede.ativo && rival && rival.recebeu && !rival.morto) alvos.push(...rival.partes);
+  const ehAlvo = h => h.object.userData.bot || h.object.userData.rival;
   let melhor = null;
   for (const desvio of [0, -0.25, 0.25]) {
     const dir = new THREE.Vector3(desvio, -0.05, -1).normalize().applyQuaternion(camera.quaternion);
     raycaster.set(camera.position, dir);
     raycaster.far = a.alcance;
     const hit = raycaster.intersectObjects(alvos, false)[0];
-    if (hit && (!melhor || (hit.object.userData.bot && !melhor.object.userData.bot))) melhor = hit;
+    if (hit && (!melhor || (ehAlvo(hit) && !ehAlvo(melhor)))) melhor = hit;
   }
   if (!melhor) return;
+
+  if (melhor.object.userData.rival) {
+    let dano = forte ? a.danoForte : a.dano;
+    const g = rival.grupo;
+    const frente = new THREE.Vector3(Math.sin(g.rotation.y), 0, Math.cos(g.rotation.y));
+    const paraJogador = new THREE.Vector3(jogador.pos.x - g.position.x, 0, jogador.pos.z - g.position.z).normalize();
+    if (frente.dot(paraJogador) < -0.3) dano *= 2; // pelas costas
+    const naCabeca = melhor.object.userData.cabeca;
+    if (naCabeca) dano *= 1.5;
+    enviar({ t: "dano", dano, cabeca: naCabeca, icone: "🔪" });
+    mostrarAcerto(false);
+    particulas(melhor.point, 0xa01010, 8);
+    somFaca("carne");
+    return;
+  }
 
   const bot = melhor.object.userData.bot;
   if (bot && !bot.morto) {
@@ -2185,7 +2267,7 @@ const matGranada = new THREE.MeshLambertMaterial({ color: 0x3f4a2a });
 
 function lancarGranada() {
   const agora = performance.now();
-  if (estado !== "jogando" || granadas <= 0 || agora - ultimaGranada < 900) return;
+  if (estado !== "jogando" || jogador.morto || granadas <= 0 || agora - ultimaGranada < 900) return;
   granadas--;
   ultimaGranada = agora;
   const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -2195,7 +2277,8 @@ function lancarGranada() {
   const vel = dir.multiplyScalar(jogador.agachado ? 11 : 16);
   vel.y += 3.5;
   cena.add(m);
-  listaGranadas.push({ mesh: m, vel, tempo: 2.2 });
+  listaGranadas.push({ mesh: m, vel, tempo: 2.2, dono: "eu" });
+  if (rede.ativo) enviar({ t: "granada", p: m.position.toArray(), v: vel.toArray() });
   trocando = Math.max(trocando, 0.3); // abaixa a arma enquanto arremessa
   bip(1800, 0.03, 0.12, "square");
   somFaca("corte");
@@ -2236,14 +2319,14 @@ function atualizarGranadas(dt) {
 
     gr.tempo -= dt;
     if (gr.tempo <= 0) {
-      explodir(p.clone());
+      explodir(p.clone(), "💣", 1, gr.dono);
       cena.remove(gr.mesh);
       listaGranadas.splice(i, 1);
     }
   }
 }
 
-function explodir(pos, icone = "💣", forca = 1) {
+function explodir(pos, icone = "💣", forca = 1, dono = "eu") {
   // bola de fogo, luz e fumaça
   const bola = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshBasicMaterial({
     color: 0xffa030, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false
@@ -2275,7 +2358,7 @@ function explodir(pos, icone = "💣", forca = 1) {
   // barris por perto explodem em cadeia
   barris.forEach(br => {
     if (!br.userData.barril.explodido && br.parent && br.position.distanceTo(pos) < 4.5) {
-      setTimeout(() => { if (estado === "jogando") explodirBarril(br); }, 180);
+      setTimeout(() => { if (estado === "jogando" || rede.ativo) explodirBarril(br, dono); }, 180);
     }
   });
 
@@ -2293,7 +2376,10 @@ function explodir(pos, icone = "💣", forca = 1) {
     }
   });
 
-  if (estado === "jogando" && distJogador < 6) {
+  if (rede.ativo && distJogador < 6) {
+    const dano = 70 * forca * (1 - distJogador / 6) * (protegido(camera.position.clone()) ? 0.25 : 1);
+    receberDano(dano, false, icone, dono);
+  } else if (estado === "jogando" && distJogador < 6) {
     const dano = 70 * forca * (1 - distJogador / 6) * (protegido(camera.position.clone()) ? 0.25 : 1);
     jogador.vida -= Math.round(dano);
     tempoDano = 1;
@@ -2950,7 +3036,7 @@ document.getElementById("botaoFecharArsenal").addEventListener("click", fecharAr
 document.addEventListener("keydown", e => {
   teclas[e.code] = true;
   if (e.code === "KeyB" && estado === "arsenal") return fecharArsenal();
-  if (estado !== "jogando") return;
+  if (estado !== "jogando" || jogador.morto) return;
   if (e.code === "KeyB") abrirArsenal();
   if (e.code === "KeyE") lancarGranada();
   // Q puxa a faca; apertando de novo, volta para a arma anterior
@@ -3008,6 +3094,387 @@ document.getElementById("botaoContinuar").addEventListener("click", continuar);
 document.getElementById("botaoMenuPausa").addEventListener("click", irParaMenu);
 document.getElementById("botaoMenuFim").addEventListener("click", irParaMenu);
 
+// =====================================================================
+//  X1 ONLINE (PeerJS: os dois navegadores se conectam direto)
+//  Cada um cuida do próprio jogador e manda a posição ~20 vezes por segundo.
+//  Quem atira confere se acertou o boneco do amigo e avisa o dano;
+//  quem morre avisa o outro, e os dois contam o placar.
+// =====================================================================
+const PREFIXO_SALA = "fliperama-zona-combate-";
+const META_ABATES = 10;
+const rede = { peer: null, conexao: null, host: false, ativo: false, euRevanche: false, amigoRevanche: false, tempoEnvio: 0 };
+const placarOnline = { eu: 0, amigo: 0 };
+let rival = null;          // boneco do amigo
+let tempoRenascer = 0, protegidoAte = 0;
+
+function carregarPeerJS() {
+  if (window.Peer) return Promise.resolve();
+  return new Promise((ok, falha) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js";
+    sc.onload = ok;
+    sc.onerror = () => falha(new Error("Não deu para carregar o modo online. Confira a internet."));
+    document.head.appendChild(sc);
+  });
+}
+
+function mostrarOnline(parte) {
+  document.getElementById("onlineInicio").style.display = parte === "inicio" ? "flex" : "none";
+  document.getElementById("onlineEspera").style.display = parte === "espera" ? "flex" : "none";
+}
+
+function erroOnline(msg) {
+  encerrarRede();
+  document.getElementById("erroOnline").textContent = msg;
+  mostrarOnline("inicio");
+}
+
+function gerarCodigo() {
+  const letras = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sem O/0 e I/1, que se confundem
+  return Array.from({ length: 5 }, () => letras[Math.floor(Math.random() * letras.length)]).join("");
+}
+
+async function criarSala(tentativa = 0) {
+  ctxAudio();
+  document.getElementById("erroOnline").textContent = "";
+  try { await carregarPeerJS(); } catch (e) { return erroOnline(e.message); }
+  const codigo = gerarCodigo();
+  rede.host = true;
+  rede.peer = new Peer(PREFIXO_SALA + codigo);
+  mostrarOnline("espera");
+  document.getElementById("codigoSala").textContent = codigo;
+  document.getElementById("statusOnline").textContent = "CONECTANDO…";
+  rede.peer.on("open", () => { document.getElementById("statusOnline").textContent = "AGUARDANDO SEU AMIGO ENTRAR…"; });
+  rede.peer.on("connection", conn => {
+    if (rede.conexao) { conn.on("open", () => conn.close()); return; } // sala cheia
+    prepararConexao(conn);
+  });
+  rede.peer.on("error", err => {
+    if (err.type === "unavailable-id" && tentativa < 3) { encerrarRede(); return criarSala(tentativa + 1); }
+    erroOnline("Erro na conexão: " + (err.type || err.message));
+  });
+}
+
+async function entrarSala() {
+  ctxAudio();
+  const codigo = document.getElementById("campoCodigo").value.trim().toUpperCase();
+  if (codigo.length !== 5) return erroOnline("Digite o código de 5 letras que seu amigo te mandou.");
+  document.getElementById("erroOnline").textContent = "";
+  try { await carregarPeerJS(); } catch (e) { return erroOnline(e.message); }
+  rede.host = false;
+  rede.peer = new Peer();
+  mostrarOnline("espera");
+  document.getElementById("codigoSala").textContent = codigo;
+  document.getElementById("statusOnline").textContent = "PROCURANDO A SALA…";
+  const desistir = setTimeout(() => {
+    if (!rede.conexao || !rede.conexao.open) erroOnline("Não achei essa sala. Confira o código ou peça para seu amigo criar outra.");
+  }, 15000);
+  rede.peer.on("open", () => {
+    const conn = rede.peer.connect(PREFIXO_SALA + codigo, { reliable: true });
+    prepararConexao(conn, () => clearTimeout(desistir));
+  });
+  rede.peer.on("error", err => {
+    clearTimeout(desistir);
+    erroOnline(err.type === "peer-unavailable" ? "Não achei essa sala. Confira o código." : "Erro na conexão: " + (err.type || err.message));
+  });
+}
+
+function prepararConexao(conn, aoAbrir) {
+  rede.conexao = conn;
+  conn.on("open", () => {
+    if (aoAbrir) aoAbrir();
+    bip(880, 0.1, 0.12, "square"); bip(1320, 0.15, 0.12, "square", 0.1);
+    document.getElementById("statusOnline").textContent = "CONECTADO! COMEÇANDO…";
+    // quem criou a sala manda o mapa e os dois começam juntos
+    if (rede.host) setTimeout(() => { enviar({ t: "comecar", mapa: mapaEscolhido }); iniciarOnline(mapaEscolhido); }, 600);
+  });
+  conn.on("data", receber);
+  conn.on("close", amigoSaiu);
+  conn.on("error", amigoSaiu);
+}
+
+function enviar(msg) { if (rede.conexao && rede.conexao.open) rede.conexao.send(msg); }
+
+function encerrarRede() {
+  const conn = rede.conexao, peer = rede.peer;
+  rede.conexao = null; rede.peer = null;
+  if (conn) { try { conn.close(); } catch (e) {} }
+  if (peer) { try { peer.destroy(); } catch (e) {} }
+}
+
+function sairOnline() {
+  rede.ativo = false;
+  encerrarRede();
+  if (rival && cena) cena.remove(rival.grupo);
+  rival = null;
+  jogador.morto = false;
+  mostrarOnline("inicio");
+  document.getElementById("placar").style.display = "";
+  document.getElementById("placarOnline").style.display = "none";
+}
+
+function amigoSaiu() {
+  if (!rede.conexao) return; // já foi tratado
+  const estavaJogando = rede.ativo;
+  sairOnline();
+  if (!estavaJogando) return erroOnline("Seu amigo saiu da sala.");
+  estado = "fim";
+  atirando = false; mirando = false;
+  if (document.pointerLockElement) document.exitPointerLock();
+  const titulo = document.getElementById("tituloFim");
+  titulo.textContent = "CONEXÃO PERDIDA";
+  titulo.className = "titulo-fim derrota";
+  document.getElementById("textoFim").innerHTML = "Seu amigo saiu da partida ou a internet caiu.";
+  document.getElementById("botaoProxima").textContent = "MENU";
+  document.getElementById("botaoProxima").onclick = irParaMenu;
+  mostrarTela("fim");
+}
+
+function iniciarOnline(mapa) {
+  rede.ativo = true;
+  rede.euRevanche = rede.amigoRevanche = false;
+  placarOnline.eu = placarOnline.amigo = 0;
+  mapaEscolhido = mapa;
+  document.querySelectorAll("#opcoesMapa .cartao").forEach(c => c.classList.toggle("selecionado", c.dataset.mapa === mapa));
+  iniciarRodada(true);
+}
+
+// Chamado pelo iniciarRodada depois de montar o mapa
+function prepararOnline() {
+  rival = criarRival();
+  // quem criou nasce no lugar normal; o convidado nasce no ponto mais longe dele
+  if (!rede.host) {
+    let melhor = pontosRota[0], maior = -1;
+    pontosRota.forEach(p => {
+      const d = Math.hypot(p.x - spawnJogador.x, p.z - spawnJogador.z);
+      if (d > maior) { maior = d; melhor = p; }
+    });
+    jogador.pos.set(melhor.x, 0, melhor.z);
+    jogador.yaw = Math.atan2(melhor.x, melhor.z); // olhando para o meio do mapa
+  }
+  protegidoAte = performance.now() + 1500;
+  atualizarPlacarOnline();
+}
+
+function criarRival() {
+  const b = criarBot(new THREE.Vector3(0, 0, 0), "Amigo", "rival");
+  bots.splice(bots.indexOf(b), 1); // não é bot: não pensa nem atira sozinho
+  b.partes.forEach(parte => { parte.userData.bot = null; parte.userData.rival = true; });
+  b.grupo.visible = false; // aparece quando chegar a primeira posição
+  Object.assign(b, { recebeu: false, alvoPos: new THREE.Vector3(), alvoYaw: 0, agachado: false, distPasso: 0 });
+  return b;
+}
+
+function atualizarPlacarOnline() {
+  document.getElementById("pontosEu").textContent = placarOnline.eu;
+  document.getElementById("pontosAmigo").textContent = placarOnline.amigo;
+}
+
+function receber(m) {
+  if (!m || !m.t) return;
+  if (m.t === "comecar") return iniciarOnline(m.mapa);
+  if (m.t === "revanche") {
+    rede.amigoRevanche = true;
+    if (!rede.euRevanche) document.getElementById("textoFim").innerHTML += "<br><b style='color:var(--destaque)'>Seu amigo quer revanche!</b>";
+    return conferirRevanche();
+  }
+  if (!rede.ativo || !cena) return;
+
+  if (m.t === "pos" && rival) {
+    rival.alvoPos.set(m.x, m.y, m.z);
+    rival.alvoYaw = m.yaw + Math.PI;
+    rival.agachado = m.ag;
+    if (!rival.recebeu || (rival.morto && !m.morto)) {
+      // primeira posição ou acabou de renascer: aparece direto no lugar
+      rival.recebeu = true;
+      rival.morto = false;
+      rival.grupo.visible = true;
+      rival.grupo.rotation.set(0, rival.alvoYaw, 0);
+      rival.grupo.position.copy(rival.alvoPos);
+    }
+    if (m.morto) rival.morto = true;
+  } else if (m.t === "tiro") {
+    const de = new THREE.Vector3().fromArray(m.de), ate = new THREE.Vector3().fromArray(m.ate);
+    rastro(de, ate, TIPOS_BOT.rival.rastro);
+    const dist = de.distanceTo(jogador.pos);
+    if (m.som !== "faca") somTiro(m.som, Math.max(0.08, 1 - dist / 55) * 0.75);
+  } else if (m.t === "dano") {
+    receberDano(m.dano, m.cabeca, m.icone, "amigo");
+  } else if (m.t === "morri") {
+    placarOnline.eu++;
+    if (rival) rival.morto = true;
+    if (m.suicidio) adicionarFeed(`Amigo ${m.icone} Amigo`, false);
+    else {
+      adicionarFeed(`Você ${m.icone} Amigo${m.cabeca ? " (na cabeça)" : ""}`, true);
+      jogador.abates++;
+      if (m.cabeca) jogador.headshots++;
+      mostrarAcerto(true);
+      bip(220, 0.15, 0.15, "triangle");
+    }
+    atualizarPlacarOnline();
+    conferirFimOnline();
+  } else if (m.t === "granada") {
+    const g = new THREE.Mesh(geoGranada, matGranada);
+    g.position.fromArray(m.p);
+    cena.add(g);
+    listaGranadas.push({ mesh: g, vel: new THREE.Vector3().fromArray(m.v), tempo: 2.2, dono: "amigo" });
+  } else if (m.t === "barril") {
+    const br = barris[m.i];
+    if (br) explodirBarril(br, "amigo");
+  }
+}
+
+// Dano no meu jogador (tiro do amigo ou explosão)
+function receberDano(dano, cabeca, icone, culpado) {
+  if (jogador.morto || estado === "menu" || estado === "fim") return;
+  if (culpado === "amigo" && performance.now() < protegidoAte) return; // proteção logo depois de nascer
+  jogador.vida -= Math.round(dano);
+  tempoDano = 1;
+  bip(120, 0.08, 0.2, "sawtooth");
+  if (jogador.vida <= 0) morrerOnline(culpado, icone, cabeca);
+  atualizarHUD();
+}
+
+function morrerOnline(culpado, icone, cabeca) {
+  if (jogador.morto) return;
+  jogador.vida = 0;
+  jogador.morto = true;
+  tempoRenascer = 3;
+  atirando = false; mirando = false; recarregando = 0;
+  modelos[armaAtual].visible = false;
+  document.getElementById("luneta").classList.remove("ativa");
+  placarOnline.amigo++; // se explodir sozinho, o ponto vai para o amigo
+  adicionarFeed(culpado === "eu" ? `Você ${icone} Você` : `Amigo ${icone} Você${cabeca ? " (na cabeça)" : ""}`, false);
+  enviar({ t: "morri", icone, cabeca: !!cabeca, suicidio: culpado === "eu" });
+  rede.tempoEnvio = 0;
+  atualizarPlacarOnline();
+  atualizarHUD();
+  if (!conferirFimOnline()) mostrarAviso("VOCÊ FOI ABATIDO — VOLTANDO EM 3 SEGUNDOS", 2900);
+}
+
+function renascer() {
+  // nasce longe do amigo, olhando para o meio do mapa
+  const longe = pontosRota.filter(p => !rival || !rival.recebeu || p.distanceTo(rival.alvoPos) > 25);
+  const lista = longe.length ? longe : pontosRota;
+  const p = lista[Math.floor(Math.random() * lista.length)];
+  jogador.pos.set(p.x, 0, p.z);
+  jogador.yaw = Math.atan2(p.x, p.z);
+  jogador.pitch = 0;
+  jogador.vy = 0;
+  jogador.vida = 100;
+  jogador.morto = false;
+  recarregarMunicaoCheia();
+  granadas = 3; spray = 0; tempoDano = 0;
+  trocarArma(armaAtual, true);
+  protegidoAte = performance.now() + 1500;
+  mostrarAviso("", 1);
+  rede.tempoEnvio = 0;
+}
+
+function conferirFimOnline() {
+  if (placarOnline.eu < META_ABATES && placarOnline.amigo < META_ABATES) return false;
+  const venci = placarOnline.eu >= META_ABATES;
+  estado = "fim";
+  atirando = false; mirando = false;
+  rede.euRevanche = rede.amigoRevanche = false;
+  if (document.pointerLockElement) document.exitPointerLock();
+  const titulo = document.getElementById("tituloFim");
+  titulo.textContent = venci ? "VOCÊ VENCEU O X1!" : "SEU AMIGO VENCEU";
+  titulo.className = "titulo-fim " + (venci ? "vitoria" : "derrota");
+  document.getElementById("textoFim").innerHTML =
+    `Placar: Você ${placarOnline.eu} × ${placarOnline.amigo} Amigo<br>Tiros na cabeça: ${jogador.headshots}`;
+  const botao = document.getElementById("botaoProxima");
+  botao.textContent = "REVANCHE";
+  botao.onclick = () => {
+    if (rede.euRevanche) return;
+    rede.euRevanche = true;
+    botao.textContent = "ESPERANDO O AMIGO…";
+    enviar({ t: "revanche" });
+    conferirRevanche();
+  };
+  setTimeout(() => { if (estado === "fim") mostrarTela("fim"); }, 1200);
+  return true;
+}
+
+function conferirRevanche() {
+  if (!rede.euRevanche || !rede.amigoRevanche || !rede.host) return;
+  enviar({ t: "comecar", mapa: mapaEscolhido });
+  iniciarOnline(mapaEscolhido);
+}
+
+function atualizarRival(dt) {
+  if (!rival || !rival.recebeu) return;
+  const g = rival.grupo;
+  if (rival.morto) {
+    g.rotation.x = Math.max(-Math.PI / 2, g.rotation.x - dt * 5);
+    return;
+  }
+  g.rotation.x = 0;
+  const p = g.position;
+  const antesX = p.x, antesZ = p.z;
+  const k = Math.min(1, dt * 14);
+  if (p.distanceTo(rival.alvoPos) > 6) p.copy(rival.alvoPos);
+  else p.lerp(rival.alvoPos, k);
+  let d = rival.alvoYaw - g.rotation.y;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  g.rotation.y += d * k;
+  g.scale.y = rival.agachado ? 0.7 : 1;
+
+  const andou = Math.hypot(p.x - antesX, p.z - antesZ);
+  const andando = andou > dt * 0.6;
+  if (andando) {
+    rival.passo += dt * 9;
+    rival.distPasso += andou;
+    if (rival.distPasso > 1.9 && !rival.agachado) {
+      rival.distPasso = 0;
+      const dist = p.distanceTo(jogador.pos);
+      if (dist < 24) {
+        const dir = new THREE.Vector3(p.x - jogador.pos.x, 0, p.z - jogador.pos.z).normalize();
+        const lado = dir.dot(new THREE.Vector3(Math.cos(jogador.yaw), 0, -Math.sin(jogador.yaw)));
+        somPasso(0.8 * (1 - dist / 24), lado);
+      }
+    }
+  }
+  const ang = andando ? Math.sin(rival.passo) * 0.6 : 0;
+  rival.pernas[0].rotation.x = ang;
+  rival.pernas[1].rotation.x = -ang;
+}
+
+function atualizarOnline(dt) {
+  if (estado === "menu" || !cena) return;
+  // mesmo pausado, o mundo continua (o amigo não para)
+  if (estado === "pausado" || estado === "arsenal") { atualizarGranadas(dt); atualizarEfeitos(dt); }
+  atualizarRival(dt);
+
+  if (jogador.morto && estado !== "fim") {
+    // câmera cai no chão enquanto espera para voltar
+    camera.position.y += (jogador.pos.y + 0.35 - camera.position.y) * Math.min(1, dt * 4);
+    tempoDano = Math.max(0.5, tempoDano - dt);
+    document.getElementById("dano").style.opacity = tempoDano * 0.8;
+    tempoRenascer -= dt;
+    if (tempoRenascer > 0) document.getElementById("aviso-centro").textContent = `VOCÊ FOI ABATIDO — VOLTANDO EM ${Math.ceil(tempoRenascer)}`;
+    else renascer();
+  }
+
+  rede.tempoEnvio -= dt;
+  if (rede.tempoEnvio <= 0) {
+    rede.tempoEnvio = 0.05;
+    enviar({ t: "pos", x: +jogador.pos.x.toFixed(2), y: +jogador.pos.y.toFixed(2), z: +jogador.pos.z.toFixed(2),
+             yaw: +jogador.yaw.toFixed(3), ag: jogador.agachado, morto: jogador.morto });
+  }
+}
+
+document.getElementById("botaoCriarSala").addEventListener("click", () => criarSala());
+document.getElementById("botaoEntrarSala").addEventListener("click", entrarSala);
+document.getElementById("campoCodigo").addEventListener("keydown", e => { if (e.key === "Enter") entrarSala(); });
+document.getElementById("botaoCancelarSala").addEventListener("click", () => { encerrarRede(); mostrarOnline("inicio"); });
+document.getElementById("botaoCopiar").addEventListener("click", () => {
+  const codigo = document.getElementById("codigoSala").textContent;
+  if (navigator.clipboard) navigator.clipboard.writeText(codigo).catch(() => {});
+  document.getElementById("botaoCopiar").textContent = "✔ COPIADO";
+  setTimeout(() => document.getElementById("botaoCopiar").textContent = "📋 COPIAR", 1500);
+});
+
 // ===== Laço principal =====
 let ultimoQuadro = performance.now();
 function laco(agora) {
@@ -3016,11 +3483,12 @@ function laco(agora) {
   ultimoQuadro = agora;
 
   if (estado === "jogando") {
-    atualizarJogador(dt);
+    if (!jogador.morto) atualizarJogador(dt);
     atualizarBots(dt);
     atualizarGranadas(dt);
     if (atirando && ARMAS[armaAtual].automatica) atirar();
   }
+  if (rede.ativo) atualizarOnline(dt);
   if (estado === "jogando" || estado === "fim") {
     if (estado === "fim") atualizarBots(dt);
     atualizarEfeitos(dt);
