@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mata Escura · Fliperama Neon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Exo+2:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fundo: #030405; --texto: #e8e4dc; --suave: #8f897c; --sangue: #c0201a; --papel: #d8d0bc; --borda: #2a2622;
+    --titulo: "Special Elite", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; color: var(--texto); font-family: "Exo 2", "Segoe UI", Arial, sans-serif; user-select: none; }
+  canvas#jogo { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* chiado de TV (estática) e cantos escuros */
+  #ruido { position: fixed; inset: -10px; pointer-events: none; opacity: 0; z-index: 3; mix-blend-mode: screen; }
+  #vinheta { position: fixed; inset: 0; pointer-events: none; z-index: 2; background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.9) 100%); }
+  #susto { position: fixed; inset: 0; pointer-events: none; z-index: 4; background: #6a0000; opacity: 0; mix-blend-mode: multiply; }
+
+  /* ===== Telas ===== */
+  .tela {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    gap: 16px; padding: 24px; overflow-y: auto; text-align: center;
+    background: radial-gradient(ellipse at 50% 40%, rgba(20, 8, 6, 0.55), rgba(0, 0, 0, 0.94) 75%);
+  }
+  .tela > :first-child { margin-top: auto; }
+  .tela > :last-child { margin-bottom: auto; }
+  .tela.escondida { display: none; }
+  .voltar { align-self: flex-start; color: var(--suave); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--borda); padding: 6px 12px; border-radius: 6px; background: rgba(0, 0, 0, 0.5); }
+  .voltar:hover { color: var(--texto); border-color: var(--sangue); }
+  .logo { font-family: var(--titulo); font-size: clamp(2.4rem, 9vw, 5rem); color: var(--papel); letter-spacing: 6px; line-height: 1.05;
+    text-shadow: 0 0 22px rgba(192, 32, 26, 0.55), 3px 3px 0 #000; animation: piscar 6s infinite; }
+  @keyframes piscar { 0%, 91%, 94%, 100% { opacity: 1; } 92% { opacity: 0.35; } 93% { opacity: 0.85; } }
+  .sub { color: var(--suave); letter-spacing: 3px; font-size: 0.85rem; }
+  .historia { max-width: 560px; font-family: var(--titulo); color: #bdb5a4; line-height: 1.6; font-size: 0.95rem; }
+  .fone { color: #d8b070; font-size: 0.85rem; border: 1px dashed #5a4a2a; padding: 6px 12px; border-radius: 6px; }
+  .secao h2 { font-size: 0.75rem; letter-spacing: 3px; color: var(--suave); margin-bottom: 8px; font-weight: 700; }
+  .opcoes { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .opcao { background: rgba(14, 12, 10, 0.9); border: 1px solid var(--borda); border-radius: 8px; padding: 10px 16px; cursor: pointer; color: var(--texto);
+    font-family: inherit; font-weight: 700; font-size: 0.95rem; min-width: 110px; }
+  .opcao small { display: block; font-weight: 400; color: var(--suave); font-size: 0.72rem; }
+  .opcao.selecionada { border-color: var(--sangue); box-shadow: 0 0 14px rgba(192, 32, 26, 0.45); }
+  .botao { font-family: var(--titulo); font-size: 1.3rem; letter-spacing: 3px; background: #5a0d0a; color: var(--papel); border: 1px solid #8a1a14;
+    border-radius: 6px; padding: 14px 44px; cursor: pointer; box-shadow: 0 0 24px rgba(192, 32, 26, 0.35); }
+  .botao:hover { background: #7a120d; }
+  .botao.sec { background: rgba(0, 0, 0, 0.5); border-color: var(--borda); box-shadow: none; }
+  .controles { font-size: 0.82rem; color: var(--suave); line-height: 2; max-width: 640px; }
+  .controles b { color: var(--texto); background: rgba(255, 255, 255, 0.07); padding: 2px 7px; border-radius: 4px; }
+  .titulo-fim { font-family: var(--titulo); font-size: clamp(2rem, 7vw, 3.6rem); letter-spacing: 4px; }
+  .titulo-fim.derrota { color: var(--sangue); text-shadow: 0 0 20px rgba(192, 32, 26, 0.7); }
+  .titulo-fim.vitoria { color: var(--papel); text-shadow: 0 0 20px rgba(255, 230, 180, 0.4); }
+  .texto-fim { font-family: var(--titulo); color: #bdb5a4; line-height: 1.8; font-size: 1.05rem; }
+  .linha-botoes { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+  /* ===== HUD ===== */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #hud.escondido { display: none; }
+  #paginas { position: absolute; left: 18px; top: 16px; font-family: var(--titulo); font-size: 1.3rem; color: var(--papel); text-shadow: 0 0 8px #000; }
+  #barras { position: absolute; left: 18px; bottom: 18px; display: grid; gap: 8px; width: 190px; }
+  .barra { font-size: 0.7rem; color: var(--suave); letter-spacing: 2px; }
+  .barra div { height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; margin-top: 3px; overflow: hidden; }
+  .barra span { display: block; height: 100%; width: 100%; background: #d8c890; }
+  #barraFolego span { background: #8fa8c0; }
+  #mira { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: rgba(255, 255, 255, 0.45); }
+  #dica { position: absolute; left: 50%; top: 56%; transform: translateX(-50%); font-family: var(--titulo); font-size: 1rem; color: var(--papel); text-shadow: 0 0 6px #000; }
+  #mensagem { position: absolute; left: 50%; bottom: 16%; transform: translateX(-50%); width: min(720px, 90vw); text-align: center;
+    font-family: var(--titulo); font-size: 1.25rem; color: var(--papel); text-shadow: 0 0 10px #000, 0 0 2px #000; transition: opacity 0.6s; }
+</style>
+</head>
+<body>
+
+<canvas id="ruido" width="256" height="256"></canvas>
+<div id="vinheta"></div>
+<div id="susto"></div>
+
+<!-- ===== Menu ===== -->
+<div class="tela" id="menu">
+  <a href="index.html" class="voltar">← Voltar ao Fliperama</a>
+  <div class="logo">MATA<br>ESCURA</div>
+  <div class="sub">SEIS PÁGINAS · UMA SAÍDA · NÃO OLHE POR MUITO TEMPO</div>
+  <p class="historia">Seu carro morreu na estrada velha da Mata Escura. Um acampante sumiu aqui faz um mês e deixou páginas pregadas pela floresta.
+    Junte as 6 páginas e volte para o carro. E se vir alguém alto entre as árvores… <b>não fique olhando.</b></p>
+  <div class="fone">🎧 Jogue com fone de ouvido: os sons dizem onde ele está.</div>
+
+  <div class="secao">
+    <h2>DIFICULDADE</h2>
+    <div class="opcoes" id="opcoesDif">
+      <button class="opcao" data-dif="facil">Fácil<small>ele demora mais</small></button>
+      <button class="opcao selecionada" data-dif="normal">Normal<small>do jeito que é</small></button>
+      <button class="opcao" data-dif="dificil">Difícil<small>pilha fraca, ele rápido</small></button>
+    </div>
+  </div>
+  <div class="secao">
+    <h2>GRÁFICOS</h2>
+    <div class="opcoes" id="opcoesGraficos">
+      <button class="opcao" data-graficos="leve">Leve<small>PC bem fraco</small></button>
+      <button class="opcao" data-graficos="normal">Normal<small>equilibrado</small></button>
+      <button class="opcao" data-graficos="alto">Alto<small>imagem nítida</small></button>
+    </div>
+  </div>
+
+  <button class="botao" id="botaoJogar">ENTRAR NA MATA</button>
+  <div class="controles">
+    <b>W A S D</b> andar &nbsp; <b>Mouse</b> olhar &nbsp; <b>Shift</b> correr &nbsp; <b>F</b> lanterna &nbsp; <b>E</b> pegar &nbsp; <b>P</b> pausar<br>
+    Dica: quando os grilos param de cantar, ele está perto.
+  </div>
+</div>
+
+<!-- ===== Pausa ===== -->
+<div class="tela escondida" id="pausa">
+  <div class="titulo-fim vitoria">PAUSADO</div>
+  <div class="linha-botoes">
+    <button class="botao" id="botaoContinuar">CONTINUAR</button>
+    <button class="botao sec" id="botaoMenuPausa">MENU</button>
+  </div>
+</div>
+
+<!-- ===== Fim ===== -->
+<div class="tela escondida" id="fim">
+  <div class="titulo-fim" id="tituloFim"></div>
+  <div class="texto-fim" id="textoFim"></div>
+  <div class="linha-botoes">
+    <button class="botao" id="botaoDeNovo">TENTAR DE NOVO</button>
+    <button class="botao sec" id="botaoMenuFim">MENU</button>
+  </div>
+</div>
+
+<!-- ===== HUD ===== -->
+<div id="hud" class="escondido">
+  <div id="paginas">Páginas 0/6</div>
+  <div id="mira"></div>
+  <div id="dica"></div>
+  <div id="mensagem"></div>
+  <div id="barras">
+    <div class="barra" id="barraPilha">🔦 LANTERNA [F]<div><span></span></div></div>
+    <div class="barra" id="barraFolego">FÔLEGO [SHIFT]<div><span></span></div></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// =====================================================================
+//  MATA ESCURA — terror numa floresta à noite.
+//  Junte 6 páginas e volte para o carro. O Vulto chega mais perto quando
+//  você não está olhando… mas olhar para ele por muito tempo enlouquece.
+// =====================================================================
+
+const MUNDO = 105;          // metade do tamanho da mata, em metros
+const TOTAL_PAGINAS = 6;
+const CARRO = { x: 0, z: -96 };
+
+const DIFS = {
+  facil:   { drenoOlhar: 0.7,  velVulto: 0.75, tele: 1.3,  bateria: 260 },
+  normal:  { drenoOlhar: 1,    velVulto: 1,    tele: 1,    bateria: 190 },
+  dificil: { drenoOlhar: 1.35, velVulto: 1.3,  tele: 0.75, bateria: 130 }
+};
+let difEscolhida = "normal";
+
+const TEXTOS_PAGINAS = [
+  ["NÃO OLHE", "PARA ELE"],
+  ["SEMPRE", "ATRÁS", "DE VOCÊ"],
+  ["OS GRILOS", "PARAM", "QUANDO ELE", "CHEGA"],
+  ["NÃO DEIXE", "A LUZ", "APAGAR"],
+  ["AS ÁRVORES", "TÊM OLHOS"],
+  ["ELE NÃO", "CORRE.", "ELE JÁ", "ESTÁ LÁ."],
+  ["SAIA", "DA MATA"],
+  ["NÃO", "NÃO", "NÃO", "NÃO"]
+];
+
+// ===== Gráficos (fica salvo; sem placa de vídeo começa no Leve) =====
+function semPlacaDeVideo() {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl");
+    if (!gl) return true;
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const nome = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "";
+    return /SwiftShader|Basic Render|llvmpipe|Software/i.test(nome);
+  } catch (e) { return false; }
+}
+const QUALIDADE = (() => {
+  try { const q = localStorage.getItem("fliperama_mata_graficos"); if (q) return q; } catch (e) {}
+  return semPlacaDeVideo() ? "leve" : "normal";
+})();
+const ESCALA = { leve: 0.5, normal: 0.72, alto: 1 }[QUALIDADE] || 0.72;
+const QTD_ARVORES = { leve: 850, normal: 1150, alto: 1400 }[QUALIDADE] || 1150;
+
+// ===== Cena =====
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+renderer.setPixelRatio(1);
+renderer.domElement.id = "jogo";
+document.body.prepend(renderer.domElement);
+
+const COR_NEVOA = 0x05070b;
+const cena = new THREE.Scene();
+cena.background = new THREE.Color(COR_NEVOA);
+cena.fog = new THREE.FogExp2(COR_NEVOA, 0.055);
+const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.08, 80);
+camera.rotation.order = "YXZ";
+cena.add(camera);
+
+function redimensionar() {
+  renderer.setSize(Math.floor(innerWidth * ESCALA), Math.floor(innerHeight * ESCALA), false);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+}
+redimensionar();
+addEventListener("resize", redimensionar);
+
+cena.add(new THREE.HemisphereLight(0x3a4a6e, 0x0a0a0c, 0.9)); // luar fraco
+const lanterna = new THREE.SpotLight(0xfff0d0, 4.5, 38, 0.48, 0.5, 1);
+lanterna.position.set(0.2, -0.2, 0);
+const alvoLanterna = new THREE.Object3D();
+alvoLanterna.position.set(0, -0.12, -1);
+lanterna.target = alvoLanterna;
+camera.add(lanterna, alvoLanterna);
+
+// ===== Texturas desenhadas no navegador =====
+function textura(w, h, desenhar, rx = 1, ry = 1) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  desenhar(c.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  return t;
+}
+function sujeira(g, w, h, qtd, cores, max) {
+  for (let i = 0; i < qtd; i++) {
+    g.fillStyle = cores[Math.floor(Math.random() * cores.length)];
+    g.globalAlpha = 0.25 + Math.random() * 0.5;
+    const s = 1 + Math.random() * max;
+    g.fillRect(Math.random() * w, Math.random() * h, s, s);
+  }
+  g.globalAlpha = 1;
+}
+const TEX = {
+  chao: textura(256, 256, (g, w, h) => {
+    g.fillStyle = "#2c2818"; g.fillRect(0, 0, w, h);
+    sujeira(g, w, h, 2600, ["#3a3420", "#1c180e", "#34482a", "#4a3218"], 4);
+    for (let i = 0; i < 90; i++) { // folhas secas
+      g.fillStyle = ["#4a3018", "#3a2410", "#5a3a1a"][i % 3];
+      g.beginPath(); g.ellipse(Math.random() * w, Math.random() * h, 4, 2, Math.random() * 3, 0, Math.PI * 2); g.fill();
+    }
+  }, 75, 75),
+  casca: textura(64, 128, (g, w, h) => {
+    g.fillStyle = "#3e2e20"; g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 3) { g.fillStyle = Math.random() < 0.5 ? "#2a1c12" : "#4a3828"; g.fillRect(x, 0, 1 + Math.random() * 2, h); }
+    sujeira(g, w, h, 200, ["#0e0a06", "#3e3020"], 3);
+  }, 1, 2),
+  pinho: textura(64, 64, (g, w, h) => {
+    g.fillStyle = "#1a3018"; g.fillRect(0, 0, w, h);
+    sujeira(g, w, h, 500, ["#284a22", "#10200e", "#30562a"], 3);
+  }, 2, 2),
+  tabuas: textura(128, 128, (g, w, h) => {
+    for (let y = 0; y < h; y += 16) {
+      g.fillStyle = Math.random() < 0.5 ? "#3a2a1c" : "#33241a"; g.fillRect(0, y, w, 16);
+      g.fillStyle = "#140c06"; g.fillRect(0, y, w, 2);
+    }
+    sujeira(g, w, h, 400, ["#1a120a", "#4a3a2a"], 3);
+  }),
+  lona: textura(64, 64, (g, w, h) => {
+    g.fillStyle = "#5a3a1e"; g.fillRect(0, 0, w, h);
+    sujeira(g, w, h, 300, ["#3a2410", "#2a1a0c", "#6a4a2a"], 6);
+  }),
+  ferrugem: textura(64, 64, (g, w, h) => {
+    g.fillStyle = "#4a2a1a"; g.fillRect(0, 0, w, h);
+    sujeira(g, w, h, 400, ["#7a3a14", "#2a160c", "#5a2a10"], 5);
+  }),
+  pedra: textura(64, 64, (g, w, h) => {
+    g.fillStyle = "#3a3a36"; g.fillRect(0, 0, w, h);
+    sujeira(g, w, h, 600, ["#2a2a26", "#4a4a44", "#26301e"], 4);
+  }),
+  estrada: textura(64, 128, (g, w, h) => {
+    g.fillStyle = "#2a2418"; g.fillRect(0, 0, w, h);
+    sujeira(g, w, h, 500, ["#1c180e", "#3a3220"], 3);
+    g.fillStyle = "#1a160c"; g.fillRect(12, 0, 8, h); g.fillRect(44, 0, 8, h); // marcas de pneu
+  }, 1, 8)
+};
+const MAT = {
+  chao: new THREE.MeshLambertMaterial({ map: TEX.chao }),
+  casca: new THREE.MeshLambertMaterial({ map: TEX.casca }),
+  pinho: new THREE.MeshLambertMaterial({ map: TEX.pinho }),
+  tabuas: new THREE.MeshLambertMaterial({ map: TEX.tabuas }),
+  lona: new THREE.MeshLambertMaterial({ map: TEX.lona, side: THREE.DoubleSide }),
+  ferrugem: new THREE.MeshLambertMaterial({ map: TEX.ferrugem }),
+  pedra: new THREE.MeshLambertMaterial({ map: TEX.pedra, flatShading: true }),
+  estrada: new THREE.MeshLambertMaterial({ map: TEX.estrada }),
+  escuro: new THREE.MeshLambertMaterial({ color: 0x0a0806 }),
+  madeira: new THREE.MeshLambertMaterial({ color: 0x2e2216 })
+};
+
+// ===== Mundo =====
+let mundo = null;                  // grupo com tudo que muda a cada partida
+let grade = new Map(), caixas = [];  // colisão: círculos (árvores, postes) e caixas giradas
+let marcos = [], paginasObj = [], pilhas = [], carro = null;
+
+const chaveGrade = (x, z) => `${Math.floor(x / 6)},${Math.floor(z / 6)}`;
+function circulo(x, z, r) {
+  const k = chaveGrade(x, z);
+  if (!grade.has(k)) grade.set(k, []);
+  grade.get(k).push({ x, z, r });
+}
+function livre(x, z, folga) {
+  const cx = Math.floor(x / 6), cz = Math.floor(z / 6);
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+    const lista = grade.get(`${cx + i},${cz + j}`);
+    if (lista) for (const c of lista) if ((c.x - x) ** 2 + (c.z - z) ** 2 < (c.r + folga) ** 2) return false;
+  }
+  for (const c of caixas) {
+    const l = paraLocal(c, x, z);
+    if (Math.abs(l.x) < c.hx + folga && Math.abs(l.z) < c.hz + folga) return false;
+  }
+  return true;
+}
+function paraLocal(c, x, z) {
+  const dx = x - c.x, dz = z - c.z, cs = Math.cos(c.ang), sn = Math.sin(c.ang);
+  return { x: dx * cs - dz * sn, z: dx * sn + dz * cs };
+}
+function paraMundo(c, lx, lz) {
+  const cs = Math.cos(c.ang), sn = Math.sin(c.ang);
+  return { x: c.x + lx * cs + lz * sn, z: c.z - lx * sn + lz * cs };
+}
+
+function malha(geo, mat, x, y, z, pai = mundo) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  pai.add(m);
+  return m;
+}
+
+// Papel pregado com frase e rabisco (desenhado na hora)
+function texturaPagina(linhas) {
+  return textura(256, 340, (g, w, h) => {
+    g.fillStyle = "#d8d0bc"; g.fillRect(0, 0, w, h);
+    sujeira(g, w, h, 300, ["#b8ae98", "#a89a80", "#c8bea8"], 6);
+    g.fillStyle = "rgba(90, 60, 30, 0.25)";
+    g.beginPath(); g.arc(w * 0.75, h * 0.8, 40, 0, Math.PI * 2); g.fill(); // mancha
+    g.fillStyle = "#1a1410";
+    g.textAlign = "center";
+    g.font = "bold 34px 'Special Elite', 'Courier New', monospace";
+    linhas.forEach((t, i) => g.fillText(t, w / 2 + (Math.random() - 0.5) * 10, 70 + i * 44, w - 20));
+    // um rabisco de figura alta no canto
+    g.strokeStyle = "#1a1410"; g.lineWidth = 3;
+    const bx = 60 + Math.random() * 130, by = 250;
+    g.beginPath(); g.moveTo(bx, by - 40); g.lineTo(bx, by + 30); g.moveTo(bx, by - 30); g.lineTo(bx - 14, by + 15);
+    g.moveTo(bx, by - 30); g.lineTo(bx + 14, by + 15); g.moveTo(bx, by + 30); g.lineTo(bx - 8, by + 60); g.moveTo(bx, by + 30); g.lineTo(bx + 8, by + 60); g.stroke();
+    g.beginPath(); g.arc(bx, by - 50, 9, 0, Math.PI * 2); g.stroke();
+    for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(Math.random() * w, h - 30 - Math.random() * 40); g.lineTo(Math.random() * w, h - 10 - Math.random() * 40); g.stroke(); }
+  });
+}
+
+// ----- Marcos da floresta (cada um pode ter uma página) -----
+// Cada construtor recebe o marco {x, z, ang, grupo} e devolve onde a página fica (coordenadas locais).
+function caixa(m, lx, lz, hx, hz) { const p = paraMundo(m, lx, lz); caixas.push({ x: p.x, z: p.z, ang: m.ang, hx, hz }); }
+function circ(m, lx, lz, r) { const p = paraMundo(m, lx, lz); circulo(p.x, p.z, r); }
+
+const CONSTRUTORES = {
+  barraca(m) {
+    const g = m.grupo;
+    const lona = malha(new THREE.ConeGeometry(2.1, 2.3, 4), MAT.lona, 0, 1.15, 0, g);
+    lona.rotation.y = Math.PI / 4;
+    const entrada = malha(new THREE.PlaneGeometry(1.1, 1.5), MAT.escuro, 0, 0.75, 1.02, g);
+    entrada.rotation.x = -0.42;
+    malha(new THREE.BoxGeometry(0.7, 0.15, 1.8), new THREE.MeshLambertMaterial({ color: 0x1e2a1a }), 1.9, 0.08, 1.3, g).rotation.y = 0.4;
+    malha(new THREE.BoxGeometry(0.25, 0.35, 0.25), MAT.ferrugem, -1.6, 0.18, 1.5, g); // lampião velho
+    malha(new THREE.BoxGeometry(0.08, 1.4, 0.08), MAT.madeira, -1.4, 0.7, 2.2, g);   // estaca da página
+    circ(m, 0, 0, 1.7);
+    circ(m, -1.4, 2.2, 0.15);
+    return { x: -1.4, y: 1.1, z: 2.26, ang: 0 };
+  },
+  cabana(m) {
+    const g = m.grupo;
+    malha(new THREE.BoxGeometry(6, 3, 5), MAT.tabuas, 0, 1.5, 0, g);
+    const teto = malha(new THREE.ConeGeometry(4.7, 2.2, 4), MAT.madeira, 0, 4.1, 0, g);
+    teto.rotation.y = Math.PI / 4;
+    teto.scale.z = 0.85;
+    malha(new THREE.PlaneGeometry(1.1, 2.1), MAT.escuro, -0.8, 1.05, 2.51, g);
+    malha(new THREE.PlaneGeometry(1.0, 0.8), new THREE.MeshBasicMaterial({ color: 0x2a1406 }), 1.7, 1.8, 2.51, g); // janela com luz fraca
+    malha(new THREE.BoxGeometry(2.4, 0.3, 1.0), MAT.madeira, -0.8, 0.15, 3.0, g);
+    caixa(m, 0, 0, 3.0, 2.5);
+    return { x: 0.5, y: 1.6, z: 2.53, ang: 0 };
+  },
+  poco(m) {
+    const g = m.grupo;
+    malha(new THREE.CylinderGeometry(1.2, 1.25, 0.9, 12), MAT.pedra, 0, 0.45, 0, g);
+    const buraco = malha(new THREE.CircleGeometry(1.0, 12), new THREE.MeshBasicMaterial({ color: 0x000000 }), 0, 0.91, 0, g);
+    buraco.rotation.x = -Math.PI / 2;
+    [-1.05, 1.05].forEach(x => malha(new THREE.BoxGeometry(0.15, 2.3, 0.15), MAT.madeira, x, 1.15, 0, g));
+    const eixo = malha(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 6), MAT.madeira, 0, 2.2, 0, g);
+    eixo.rotation.z = Math.PI / 2;
+    malha(new THREE.BoxGeometry(0.02, 0.7, 0.02), MAT.madeira, 0.2, 1.85, 0, g);
+    malha(new THREE.CylinderGeometry(0.18, 0.14, 0.3, 8), MAT.ferrugem, 0.2, 1.4, 0, g);
+    circ(m, 0, 0, 1.45);
+    return { x: 1.05, y: 1.3, z: 0.09, ang: 0 };
+  },
+  caminhonete(m) {
+    const g = m.grupo;
+    const corpo = new THREE.Group();
+    g.add(corpo);
+    corpo.rotation.z = 0.07; // sem uma roda, meio tombada
+    malha(new THREE.BoxGeometry(2.0, 0.8, 5), MAT.ferrugem, 0, 0.95, 0, corpo);
+    malha(new THREE.BoxGeometry(1.9, 0.9, 1.7), MAT.ferrugem, 0, 1.8, 0.7, corpo);
+    malha(new THREE.PlaneGeometry(1.6, 0.6), MAT.escuro, 0, 1.9, 1.56, corpo);
+    const geoRoda = new THREE.CylinderGeometry(0.45, 0.45, 0.3, 10);
+    geoRoda.rotateZ(Math.PI / 2);
+    [[-1.0, 1.6], [1.0, 1.6], [-1.0, -1.6]].forEach(([x, z]) => malha(geoRoda, MAT.escuro, x, 0.45, z, corpo));
+    caixa(m, 0, 0, 1.1, 2.6);
+    return { x: 1.04, y: 1.4, z: 0.6, ang: Math.PI / 2 };
+  },
+  torre(m) {
+    const g = m.grupo;
+    const geoPerna = new THREE.BoxGeometry(0.25, 7, 0.25);
+    [[-1.3, -1.3], [1.3, -1.3], [-1.3, 1.3], [1.3, 1.3]].forEach(([x, z]) => { malha(geoPerna, MAT.madeira, x, 3.5, z, g); circ(m, x, z, 0.3); });
+    malha(new THREE.BoxGeometry(3.4, 0.2, 3.4), MAT.tabuas, 0, 7, 0, g);
+    [[0, 1.65, 3.4, 0.08], [0, -1.65, 3.4, 0.08]].forEach(([x, z, w, d]) => malha(new THREE.BoxGeometry(w, 0.9, d), MAT.madeira, x, 7.5, z, g));
+    const teto = malha(new THREE.ConeGeometry(2.8, 1.6, 4), MAT.madeira, 0, 9.2, 0, g);
+    teto.rotation.y = Math.PI / 4;
+    for (let y = 0.5; y < 7; y += 0.5) malha(new THREE.BoxGeometry(0.8, 0.06, 0.06), MAT.madeira, 0, y, 1.45, g); // escada
+    return { x: 1.3, y: 1.5, z: 1.44, ang: 0 };
+  },
+  pedras(m) {
+    const g = m.grupo;
+    [[0, 1.6, 0, 2.4], [2.7, 1.1, 0.9, 1.8], [-2.3, 0.9, -0.7, 1.4]].forEach(([x, y, z, r]) => {
+      const p = malha(new THREE.DodecahedronGeometry(r, 0), MAT.pedra, x, y, z, g);
+      p.rotation.set(Math.random(), Math.random(), Math.random());
+      circ(m, x, z, r * 0.9);
+    });
+    return { x: 0, y: 1.5, z: 2.12, ang: 0 };
+  },
+  fogueira(m) {
+    const g = m.grupo;
+    for (let i = 0; i < 9; i++) {
+      const a = i / 9 * Math.PI * 2;
+      malha(new THREE.DodecahedronGeometry(0.22, 0), MAT.pedra, Math.cos(a) * 0.8, 0.12, Math.sin(a) * 0.8, g);
+    }
+    [0, 1.1, 2.2].forEach(a => { const t = malha(new THREE.CylinderGeometry(0.1, 0.1, 1.3, 6), MAT.escuro, 0, 0.15, 0, g); t.rotation.set(Math.PI / 2, 0, a); });
+    [[0, 2.6, 0], [2.4, -0.6, Math.PI / 2.4]].forEach(([x, z, a]) => {
+      const banco = malha(new THREE.CylinderGeometry(0.3, 0.3, 2.4, 8), MAT.casca, x, 0.3, z, g);
+      banco.rotation.set(0, a, Math.PI / 2);
+      const p = paraMundo(m, x, z);
+      caixas.push({ x: p.x, z: p.z, ang: m.ang + a, hx: 1.2, hz: 0.35 });
+    });
+    malha(new THREE.BoxGeometry(0.1, 1.4, 0.1), MAT.madeira, -2.0, 0.7, 1.6, g);
+    circ(m, -2.0, 1.6, 0.15);
+    return { x: -2.0, y: 1.1, z: 1.66, ang: 0 };
+  },
+  arvoreMorta(m) {
+    const g = m.grupo;
+    const matMorta = new THREE.MeshLambertMaterial({ map: TEX.casca, color: 0x8a8a8a });
+    malha(new THREE.CylinderGeometry(0.7, 1.3, 13, 8), matMorta, 0, 6.5, 0, g);
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.1, y = 5 + i * 1.1;
+      const galho = malha(new THREE.CylinderGeometry(0.08, 0.22, 4, 5), matMorta, Math.cos(a) * 1.4, y, Math.sin(a) * 1.4, g);
+      galho.rotation.set(Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9);
+    }
+    circ(m, 0, 0, 1.35);
+    return { x: 0, y: 1.6, z: 1.27, ang: 0 };
+  }
+};
+
+function criarArvores() {
+  const dummy = new THREE.Object3D();
+  const geoTronco = new THREE.CylinderGeometry(0.2, 0.36, 7, 6); geoTronco.translate(0, 3.5, 0);
+  const geoCopa1 = new THREE.ConeGeometry(2.3, 6, 7); geoCopa1.translate(0, 7.4, 0);
+  const geoCopa2 = new THREE.ConeGeometry(1.6, 4.4, 7); geoCopa2.translate(0, 10.2, 0);
+  const lista = [];
+  let tentativas = 0;
+  while (lista.length < QTD_ARVORES && tentativas < QTD_ARVORES * 6) {
+    tentativas++;
+    const x = (Math.random() * 2 - 1) * (MUNDO + 14), z = (Math.random() * 2 - 1) * (MUNDO + 14);
+    if (Math.abs(x - CARRO.x) < 6 && z < CARRO.z + 12) continue;     // estrada e carro
+    if (marcos.some(m => (m.x - x) ** 2 + (m.z - z) ** 2 < 8.5 ** 2)) continue;
+    if (!livre(x, z, 2.2)) continue;
+    const s = 0.75 + Math.random() * 0.6;
+    circulo(x, z, 0.38 * s);
+    lista.push({ x, z, s, morta: Math.random() < 0.12, giro: Math.random() * 6 });
+  }
+  const tronco = new THREE.InstancedMesh(geoTronco, MAT.casca, lista.length);
+  const copa1 = new THREE.InstancedMesh(geoCopa1, MAT.pinho, lista.length);
+  const copa2 = new THREE.InstancedMesh(geoCopa2, MAT.pinho, lista.length);
+  const cor = new THREE.Color();
+  lista.forEach((a, i) => {
+    dummy.position.set(a.x, 0, a.z);
+    dummy.rotation.set((Math.random() - 0.5) * 0.06, a.giro, (Math.random() - 0.5) * 0.06);
+    dummy.scale.set(a.s, a.s * (0.9 + Math.random() * 0.3), a.s);
+    dummy.updateMatrix();
+    tronco.setMatrixAt(i, dummy.matrix);
+    if (a.morta) dummy.scale.setScalar(0.0001); // árvore morta: só o tronco
+    dummy.updateMatrix();
+    copa1.setMatrixAt(i, dummy.matrix);
+    copa2.setMatrixAt(i, dummy.matrix);
+    cor.setHSL(0.27 + Math.random() * 0.06, 0.25, 0.32 + Math.random() * 0.25);
+    copa1.setColorAt(i, cor);
+    copa2.setColorAt(i, cor);
+  });
+  [tronco, copa1, copa2].forEach(m => mundo.add(m));
+
+  // arbustos baixos
+  const geoArbusto = new THREE.IcosahedronGeometry(0.8, 0);
+  const qtdArbustos = Math.round(QTD_ARVORES / 4);
+  // material separado: o das copas usa cor por árvore e não pode ser dividido com quem não usa
+  const arbustos = new THREE.InstancedMesh(geoArbusto, new THREE.MeshLambertMaterial({ map: TEX.pinho, color: 0x3a5034 }), qtdArbustos);
+  for (let i = 0; i < qtdArbustos; i++) {
+    const x = (Math.random() * 2 - 1) * MUNDO, z = (Math.random() * 2 - 1) * MUNDO;
+    dummy.position.set(x, 0.3, z);
+    dummy.rotation.set(Math.random(), Math.random(), 0);
+    dummy.scale.set(1 + Math.random() * 0.8, 0.6 + Math.random() * 0.4, 1 + Math.random() * 0.8);
+    dummy.updateMatrix();
+    arbustos.setMatrixAt(i, dummy.matrix);
+  }
+  mundo.add(arbustos);
+}
+
+function criarCarro() {
+  const g = new THREE.Group();
+  g.position.set(CARRO.x, 0, CARRO.z);
+  mundo.add(g);
+  const lata = new THREE.MeshLambertMaterial({ color: 0x3a0e0c });
+  malha(new THREE.BoxGeometry(1.8, 0.75, 4.2), lata, 0, 0.75, 0, g);
+  malha(new THREE.BoxGeometry(1.7, 0.7, 2.1), lata, 0, 1.45, -0.3, g);
+  malha(new THREE.PlaneGeometry(1.5, 0.55), MAT.escuro, 0, 1.5, 0.76, g).rotation.x = -0.3;
+  const geoRoda = new THREE.CylinderGeometry(0.38, 0.38, 0.28, 10); geoRoda.rotateZ(Math.PI / 2);
+  [[-0.9, 1.3], [0.9, 1.3], [-0.9, -1.3], [0.9, -1.3]].forEach(([x, z]) => malha(geoRoda, MAT.escuro, x, 0.38, z, g));
+  const matFarol = new THREE.MeshBasicMaterial({ color: 0x3a3a30 });
+  const farois = [-0.6, 0.6].map(x => malha(new THREE.PlaneGeometry(0.4, 0.2), matFarol, x, 0.8, 2.11, g));
+  // luz dos faróis (só acende na hora de fugir)
+  const luz = new THREE.SpotLight(0xfff0c0, 0, 40, 0.5, 0.6, 1);
+  luz.position.set(0, 1, 2.2);
+  const alvo = new THREE.Object3D();
+  alvo.position.set(0, 0, 14);
+  g.add(luz, alvo);
+  luz.target = alvo;
+  caixas.push({ x: CARRO.x, z: CARRO.z, ang: 0, hx: 1.0, hz: 2.2 });
+  // estrada de terra
+  const estrada = malha(new THREE.PlaneGeometry(5, 34), MAT.estrada, CARRO.x, 0.02, CARRO.z - 4);
+  estrada.rotation.x = -Math.PI / 2;
+  return { grupo: g, matFarol, luz };
+}
+
+function construirMundo() {
+  if (mundo) {
+    cena.remove(mundo);
+    mundo.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  }
+  mundo = new THREE.Group();
+  cena.add(mundo);
+  grade = new Map(); caixas = []; marcos = []; paginasObj = []; pilhas = [];
+
+  const chao = malha(new THREE.PlaneGeometry(340, 340), MAT.chao, 0, 0, 0);
+  chao.rotation.x = -Math.PI / 2;
+  carro = criarCarro();
+
+  // 8 marcos espalhados, longe do carro e longe uns dos outros
+  const tipos = Object.keys(CONSTRUTORES).sort(() => Math.random() - 0.5);
+  let tentativas = 0, folga = 36;
+  while (marcos.length < tipos.length && tentativas < 4000) {
+    tentativas++;
+    if (tentativas % 800 === 0) folga -= 4;
+    const x = (Math.random() * 2 - 1) * (MUNDO - 15), z = (Math.random() * 2 - 1) * (MUNDO - 15);
+    if (Math.hypot(x - CARRO.x, z - CARRO.z) < 34) continue;
+    if (marcos.some(m => Math.hypot(m.x - x, m.z - z) < folga)) continue;
+    const m = { x, z, ang: Math.random() * Math.PI * 2, tipo: tipos[marcos.length], grupo: new THREE.Group() };
+    m.grupo.position.set(x, 0, z);
+    m.grupo.rotation.y = m.ang;
+    mundo.add(m.grupo);
+    m.pagina = CONSTRUTORES[m.tipo](m);
+    marcos.push(m);
+  }
+
+  criarArvores();
+
+  // 6 das 8 marcas recebem uma página (sorteadas a cada partida)
+  const textos = [...TEXTOS_PAGINAS].sort(() => Math.random() - 0.5);
+  [...marcos].sort(() => Math.random() - 0.5).slice(0, TOTAL_PAGINAS).forEach((m, i) => {
+    const p = m.pagina;
+    const pos = paraMundo(m, p.x, p.z);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.56), new THREE.MeshLambertMaterial({ map: texturaPagina(textos[i]), color: 0x8a8476, side: THREE.DoubleSide }));
+    mesh.position.set(pos.x, p.y, pos.z);
+    mesh.rotation.set(0, m.ang + p.ang, (Math.random() - 0.5) * 0.2);
+    mundo.add(mesh);
+    paginasObj.push({ mesh, pos: mesh.position, tipo: "pagina", pego: false });
+  });
+
+  // pilhas de lanterna jogadas por aí
+  for (let i = 0; i < 5; i++) {
+    let x, z, k = 0;
+    do { x = (Math.random() * 2 - 1) * (MUNDO - 8); z = (Math.random() * 2 - 1) * (MUNDO - 8); k++; } while (!livre(x, z, 1) && k < 50);
+    const mesh = malha(new THREE.CylinderGeometry(0.07, 0.07, 0.24, 8), new THREE.MeshBasicMaterial({ color: 0x3aa04a }), x, 0.08, z);
+    mesh.rotation.z = Math.PI / 2;
+    pilhas.push({ mesh, pos: mesh.position, tipo: "pilha", pego: false });
+  }
+}
+
+// ===== O Vulto =====
+function criarVulto() {
+  const g = new THREE.Group();
+  // terno escuro (a lanterna mostra a silhueta) e uma cabeça pálida sem rosto
+  const preto = new THREE.MeshLambertMaterial({ color: 0x16161a });
+  const palido = new THREE.MeshLambertMaterial({ color: 0x8a857a });
+  const add = (w, h, d, x, y, z) => malha(new THREE.BoxGeometry(w, h, d), preto, x, y, z, g);
+  add(0.42, 1.5, 0.26, 0, 1.9, 0);                         // corpo comprido
+  add(0.12, 1.25, 0.12, -0.11, 0.62, 0);                   // pernas finas
+  add(0.12, 1.25, 0.12, 0.11, 0.62, 0);
+  const bracoE = add(0.08, 1.8, 0.08, -0.29, 1.6, 0.02);   // braços que vão até os joelhos
+  const bracoD = add(0.08, 1.8, 0.08, 0.29, 1.6, 0.02);
+  bracoE.rotation.z = 0.05; bracoD.rotation.z = -0.05;
+  add(0.06, 0.3, 0.06, 0, 2.75, 0);
+  const cabeca = new THREE.Group();
+  cabeca.position.y = 3.05;
+  g.add(cabeca);
+  malha(new THREE.BoxGeometry(0.32, 0.44, 0.3), palido, 0, 0, 0, cabeca);
+  const buraco = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  [-0.075, 0.075].forEach(x => malha(new THREE.PlaneGeometry(0.09, 0.06), buraco, x, 0.05, 0.152, cabeca));
+  const matOlho = new THREE.MeshBasicMaterial({ color: 0xfff6e0, fog: false });
+  const olhos = [-0.075, 0.075].map(x => malha(new THREE.PlaneGeometry(0.03, 0.02), matOlho, x, 0.05, 0.156, cabeca));
+  cena.add(g);
+  g.visible = false;
+  return { grupo: g, cabeca, olhos };
+}
+const vultoMesh = criarVulto();
+const vulto = { pos: new THREE.Vector3(0, 0, -999), ativo: false, tempoTele: 8, visto: false, dist: 999, tempoGalho: 5 };
+
+// ===== Estado =====
+let estado = "menu"; // menu | jogando | pausado | pego | fim
+let dif = DIFS.normal;
+const jogador = { pos: new THREE.Vector3(), yaw: Math.PI, pitch: 0, folego: 1, cansado: false, bateria: 1, ligada: true, paginas: 0, balanco: 0, distPasso: 0 };
+let teclas = {}, tempo = 0, estatica = 0, fugindo = false, tempoSusto = 0, tempoMensagem = 0;
+
+function iniciar() {
+  ctxAudio();
+  dif = DIFS[difEscolhida];
+  construirMundo();
+  jogador.pos.set(CARRO.x + 1.8, 0, CARRO.z + 2.5);
+  jogador.yaw = Math.PI; jogador.pitch = 0;
+  jogador.folego = 1; jogador.cansado = false; jogador.bateria = 1; jogador.ligada = true; jogador.paginas = 0;
+  vulto.ativo = false; vulto.pos.set(0, 0, -999); vulto.tempoTele = 10; vultoMesh.grupo.visible = false;
+  carro.matFarol.color.set(0x3a3a30); carro.luz.intensity = 0;
+  tempo = 0; estatica = 0; fugindo = false;
+  cena.fog.density = 0.055;
+  estado = "jogando";
+  mostrarTela(null);
+  document.getElementById("hud").classList.remove("escondido");
+  atualizarPaginas();
+  mensagem("Ache as 6 páginas. Depois volte para o carro.", 5);
+  iniciarAmbiente();
+  travar();
+}
+
+function travar() { const r = renderer.domElement.requestPointerLock(); if (r && r.catch) r.catch(() => {}); }
+function mostrarTela(id) { ["menu", "pausa", "fim"].forEach(t => document.getElementById(t).classList.toggle("escondida", t !== id)); }
+function mensagem(t, s) { const el = document.getElementById("mensagem"); el.textContent = t; el.style.opacity = 1; tempoMensagem = s; }
+function atualizarPaginas() { document.getElementById("paginas").textContent = `Páginas ${jogador.paginas}/${TOTAL_PAGINAS}`; }
+
+// ===== Movimento e colisão =====
+function resolverColisao(p, r) {
+  const cx = Math.floor(p.x / 6), cz = Math.floor(p.z / 6);
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+    const lista = grade.get(`${cx + i},${cz + j}`);
+    if (!lista) continue;
+    for (const c of lista) {
+      const dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot(dx, dz), min = c.r + r;
+      if (d < min && d > 0) { p.x = c.x + dx / d * min; p.z = c.z + dz / d * min; }
+    }
+  }
+  for (const c of caixas) {
+    const l = paraLocal(c, p.x, p.z);
+    const ex = c.hx + r - Math.abs(l.x), ez = c.hz + r - Math.abs(l.z);
+    if (ex > 0 && ez > 0) {
+      if (ex < ez) l.x += Math.sign(l.x || 1) * ex; else l.z += Math.sign(l.z || 1) * ez;
+      const w = paraMundo(c, l.x, l.z);
+      p.x = w.x; p.z = w.z;
+    }
+  }
+  const lim = MUNDO - 1;
+  if (Math.abs(p.x) > lim || Math.abs(p.z) > lim) {
+    p.x = Math.max(-lim, Math.min(lim, p.x));
+    p.z = Math.max(-lim, Math.min(lim, p.z));
+    if (tempoMensagem <= 0) mensagem("A mata é fechada demais para passar por aqui.", 2);
+  }
+}
+
+function atualizarJogador(dt) {
+  const frente = new THREE.Vector3(-Math.sin(jogador.yaw), 0, -Math.cos(jogador.yaw));
+  const direita = new THREE.Vector3(Math.cos(jogador.yaw), 0, -Math.sin(jogador.yaw));
+  const mov = new THREE.Vector3();
+  if (teclas.KeyW) mov.add(frente);
+  if (teclas.KeyS) mov.sub(frente);
+  if (teclas.KeyD) mov.add(direita);
+  if (teclas.KeyA) mov.sub(direita);
+  const andando = mov.lengthSq() > 0;
+  const querCorrer = (teclas.ShiftLeft || teclas.ShiftRight) && andando && !jogador.cansado;
+  if (querCorrer) { jogador.folego -= dt / 7; if (jogador.folego <= 0) { jogador.folego = 0; jogador.cansado = true; } }
+  else { jogador.folego = Math.min(1, jogador.folego + dt / 11); if (jogador.folego > 0.35) jogador.cansado = false; }
+  const vel = querCorrer ? 4.8 : 2.6;
+  if (andando) {
+    mov.normalize().multiplyScalar(vel * dt);
+    jogador.pos.add(mov);
+    resolverColisao(jogador.pos, 0.35);
+    jogador.balanco += dt * vel * 2.2;
+    jogador.distPasso += vel * dt;
+    if (jogador.distPasso > (querCorrer ? 1.9 : 1.5)) { jogador.distPasso = 0; somPasso(querCorrer ? 0.22 : 0.12); }
+  }
+  if (jogador.cansado && Math.random() < dt * 1.5) respiracao();
+
+  // lanterna: gasta pilha e falha quando está acabando
+  if (jogador.ligada) jogador.bateria = Math.max(0, jogador.bateria - dt / dif.bateria);
+  let luz = jogador.ligada && jogador.bateria > 0 ? 4.5 : 0;
+  if (luz && (jogador.bateria < 0.15 || estatica > 0.5) && Math.random() < 0.12) luz *= Math.random() * 0.4;
+  if (luz && jogador.bateria < 0.15) luz *= 0.4 + jogador.bateria * 4;
+  lanterna.intensity = luz;
+
+  const bob = andando ? Math.sin(jogador.balanco) * 0.05 : 0;
+  camera.position.set(jogador.pos.x, 1.62 + bob, jogador.pos.z);
+  camera.rotation.set(jogador.pitch + (estatica > 0.3 ? (Math.random() - 0.5) * estatica * 0.02 : 0), jogador.yaw, 0);
+
+  // pegar coisas: o que está perto e na frente
+  let alvo = null, melhor = 2.4;
+  const olhar = camera.getWorldDirection(new THREE.Vector3());
+  for (const o of paginasObj.concat(pilhas)) {
+    if (o.pego) continue;
+    const d = Math.hypot(o.pos.x - camera.position.x, o.pos.z - camera.position.z);
+    if (d > melhor) continue;
+    const para = o.pos.clone().sub(camera.position).normalize();
+    if (para.dot(olhar) > 0.55) { melhor = d; alvo = o; }
+  }
+  alvoAtual = alvo;
+  document.getElementById("dica").textContent = alvo ? (alvo.tipo === "pagina" ? "[E] PEGAR PÁGINA" : "[E] PEGAR PILHA") : "";
+
+  // fuga: chegou no carro
+  if (fugindo && Math.hypot(jogador.pos.x - CARRO.x, jogador.pos.z - CARRO.z) < 3.4) vencer();
+}
+let alvoAtual = null;
+
+function pegar() {
+  const o = alvoAtual;
+  if (!o || o.pego || estado !== "jogando") return;
+  o.pego = true;
+  mundo.remove(o.mesh);
+  if (o.tipo === "pilha") {
+    jogador.bateria = Math.min(1, jogador.bateria + 0.55);
+    tom(900, 0.06, "square", 0.05); tom(1300, 0.08, "square", 0.05, 0.06);
+    mensagem("Pilha nova na lanterna.", 2);
+    return;
+  }
+  jogador.paginas++;
+  atualizarPaginas();
+  somPagina();
+  vulto.ativo = true;
+  vulto.tempoTele = Math.min(vulto.tempoTele, 3);
+  if (jogador.paginas >= TOTAL_PAGINAS) {
+    fugindo = true;
+    carro.matFarol.color.set(0xfff4c8);
+    carro.luz.intensity = 2.6;
+    mensagem("Os faróis do carro acenderam lá longe. CORRA PARA O CARRO!", 6);
+  } else {
+    const restam = TOTAL_PAGINAS - jogador.paginas;
+    mensagem(`${jogador.paginas} de ${TOTAL_PAGINAS}… faltam ${restam}.`, 3);
+  }
+}
+
+// ===== Comportamento do Vulto =====
+const tmp = new THREE.Vector3();
+function nivelPerigo() { return fugindo ? 7 : jogador.paginas; }
+
+function teleportarVulto() {
+  const n = nivelPerigo() / 7;
+  const dist = (38 - 27 * n) * (0.85 + Math.random() * 0.3);
+  const frenteAng = Math.atan2(-Math.sin(jogador.yaw), -Math.cos(jogador.yaw));
+  for (let k = 0; k < 20; k++) {
+    // quase sempre fora da sua visão; às vezes lá na frente, de longe
+    const naFrente = Math.random() < 0.22;
+    const ang = naFrente ? frenteAng + (Math.random() - 0.5) * 0.7 : frenteAng + Math.PI + (Math.random() - 0.5) * 3.2;
+    const d = naFrente ? dist + 8 : dist;
+    const x = jogador.pos.x + Math.sin(ang) * d, z = jogador.pos.z + Math.cos(ang) * d;
+    if (Math.abs(x) > MUNDO - 2 || Math.abs(z) > MUNDO - 2 || !livre(x, z, 0.8)) continue;
+    vulto.pos.set(x, 0, z);
+    vultoMesh.grupo.visible = true;
+    if (d < 24) somAparecer();
+    return;
+  }
+}
+
+function atualizarVulto(dt) {
+  if (!vulto.ativo && tempo > 55) vulto.ativo = true;
+  const n = nivelPerigo();
+  const dx = jogador.pos.x - vulto.pos.x, dz = jogador.pos.z - vulto.pos.z;
+  vulto.dist = Math.hypot(dx, dz);
+
+  // está na tela? (projeta o corpo e a cabeça na câmera)
+  let naTela = false;
+  for (const y of [1.6, 3.0]) {
+    tmp.set(vulto.pos.x, y, vulto.pos.z).project(camera);
+    if (tmp.z < 1 && Math.abs(tmp.x) < 0.95 && Math.abs(tmp.y) < 0.95) naTela = true;
+  }
+  const alcance = lanterna.intensity > 0.5 ? 30 : 12; // no escuro só os olhos aparecem, e de perto
+  vulto.visto = vulto.ativo && vultoMesh.grupo.visible && naTela && vulto.dist < alcance;
+
+  if (vulto.ativo) {
+    if (vulto.visto) {
+      estatica += dt * (0.1 + 2.2 / (vulto.dist + 2)) * dif.drenoOlhar;
+    } else {
+      estatica = Math.max(0, estatica - dt * 0.17);
+      if (vulto.dist < 6) estatica += dt * 0.05;
+      // anda devagar na sua direção quando você não está olhando
+      const vel = (0.5 + n * 0.28) * dif.velVulto;
+      if (vulto.dist > 1) {
+        vulto.pos.x += dx / vulto.dist * vel * dt;
+        vulto.pos.z += dz / vulto.dist * vel * dt;
+      }
+      vulto.tempoTele -= dt;
+      if (vulto.tempoTele <= 0) {
+        vulto.tempoTele = (16 - 11 * n / 7) * dif.tele * (0.7 + Math.random() * 0.6);
+        teleportarVulto();
+      }
+      // estalo de galho do lado dele, para você saber de onde vem
+      vulto.tempoGalho -= dt;
+      if (vulto.dist < 26 && vulto.tempoGalho <= 0) { vulto.tempoGalho = 4 + Math.random() * 6; somGalho(); }
+    }
+    vultoMesh.grupo.position.copy(vulto.pos);
+    vultoMesh.grupo.rotation.y = Math.atan2(dx, dz);
+    vultoMesh.cabeca.rotation.z = Math.sin(tempo * 1.7) * 0.08 + (Math.random() < 0.03 ? (Math.random() - 0.5) * 0.5 : 0);
+    vultoMesh.olhos.forEach(o => o.visible = vulto.dist < 32);
+  }
+  estatica = Math.min(1, estatica);
+  if (vulto.ativo && (vulto.dist < 1.6 || estatica >= 1)) pego();
+}
+
+// ===== Fim de jogo =====
+function pego() {
+  estado = "pego";
+  tempoSusto = 0;
+  pararAmbiente();
+  grito();
+  document.getElementById("hud").classList.add("escondido");
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+function vencer() {
+  estado = "fim";
+  pararAmbiente();
+  if (document.pointerLockElement) document.exitPointerLock();
+  document.getElementById("hud").classList.add("escondido");
+  [220, 277, 330, 440].forEach((f, i) => tom(f, 1.2, "triangle", 0.05, i * 0.25));
+  const s = Math.round(tempo);
+  let recorde = "";
+  try {
+    const antigo = Number(localStorage.getItem("fliperama_mata")) || 0;
+    if (!antigo || s < antigo) { localStorage.setItem("fliperama_mata", s); recorde = "<br>★ NOVO RECORDE ★"; }
+  } catch (e) {}
+  document.getElementById("tituloFim").textContent = "VOCÊ ESCAPOU";
+  document.getElementById("tituloFim").className = "titulo-fim vitoria";
+  document.getElementById("textoFim").innerHTML = `O motor pegou na primeira.<br>Você não olhou para trás.<br>Tempo: ${formatar(s)}${recorde}`;
+  mostrarTela("fim");
+}
+
+function mostrarDerrota() {
+  estado = "fim";
+  document.getElementById("susto").style.opacity = 0;
+  document.getElementById("tituloFim").textContent = "ELE TE ENCONTROU";
+  document.getElementById("tituloFim").className = "titulo-fim derrota";
+  document.getElementById("textoFim").innerHTML = `Páginas: ${jogador.paginas} de ${TOTAL_PAGINAS}<br>Tempo na mata: ${formatar(Math.round(tempo))}`;
+  mostrarTela("fim");
+}
+const formatar = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+// ===== Sons (todos gerados pelo navegador) =====
+let audio = null, saida = null, bufRuido = null, ambiente = [], estaticaGanho = null, droneGanhos = [], griloVol = 1, tempoGrilo = 0, tempoCoruja = 20, tempoCoracao = 0;
+function ctxAudio() {
+  if (!audio) {
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    saida = audio.createGain();
+    saida.gain.value = 0.9;
+    saida.connect(audio.destination);
+    bufRuido = audio.createBuffer(1, audio.sampleRate * 2, audio.sampleRate);
+    const d = bufRuido.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (audio.state === "suspended") audio.resume();
+  return audio;
+}
+function painel(pan) {
+  const p = audio.createStereoPanner ? audio.createStereoPanner() : audio.createGain();
+  if (p.pan) p.pan.value = Math.max(-1, Math.min(1, pan));
+  p.connect(saida);
+  return p;
+}
+function tom(f, dur, tipo = "sine", vol = 0.1, atraso = 0, pan = 0, deslize = 1) {
+  if (!audio) return;
+  const t = audio.currentTime + atraso;
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.type = tipo;
+  o.frequency.setValueAtTime(f, t);
+  if (deslize !== 1) o.frequency.exponentialRampToValueAtTime(f * deslize, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(painel(pan));
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function ruido(dur, tipoFiltro, freq, vol, pan = 0, atraso = 0) {
+  if (!audio) return;
+  const t = audio.currentTime + atraso;
+  const s = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+  s.buffer = bufRuido;
+  f.type = tipoFiltro; f.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(painel(pan));
+  s.start(t, Math.random()); s.stop(t + dur + 0.05);
+}
+// de que lado (esquerda/direita) um ponto está, para o fone
+function ladoDe(x, z) {
+  const dx = x - jogador.pos.x, dz = z - jogador.pos.z, d = Math.hypot(dx, dz) || 1;
+  return (dx / d) * Math.cos(jogador.yaw) - (dz / d) * Math.sin(jogador.yaw);
+}
+const somPasso = vol => { ruido(0.09, "lowpass", 700 + Math.random() * 500, vol); ruido(0.05, "highpass", 3000, vol * 0.3, 0, 0.02); };
+const respiracao = () => ruido(0.5, "bandpass", 900, 0.04);
+function somPagina() { ruido(0.25, "highpass", 2500, 0.08); tom(48, 2.5, "sine", 0.35); tom(96, 2, "sawtooth", 0.03); }
+function somAparecer() { const p = ladoDe(vulto.pos.x, vulto.pos.z); [55, 58.3, 82.4].forEach(f => tom(f, 3, "sawtooth", 0.05, 0, p)); tom(1760, 1.6, "sine", 0.025, 0.05, p, 0.97); }
+function somGalho() { const p = ladoDe(vulto.pos.x, vulto.pos.z); const v = Math.max(0.05, 0.4 - vulto.dist / 70); ruido(0.06, "highpass", 1800, v, p); ruido(0.1, "bandpass", 600, v * 0.7, p, 0.03); }
+function grito() {
+  [110, 116, 220, 233, 440].forEach(f => tom(f, 1.5, "sawtooth", 0.09, 0, 0, 0.6));
+  ruido(1.5, "bandpass", 1500, 0.6);
+}
+function batida() { tom(55, 0.18, "sine", 0.5); tom(50, 0.2, "sine", 0.4, 0.17); }
+
+// sons contínuos: vento, chiado da estática e um zumbido que cresce a cada página
+function iniciarAmbiente() {
+  pararAmbiente();
+  const vento = audio.createBufferSource(); vento.buffer = bufRuido; vento.loop = true;
+  const fv = audio.createBiquadFilter(); fv.type = "lowpass"; fv.frequency.value = 380;
+  const gv = audio.createGain(); gv.gain.value = 0.05;
+  const lfo = audio.createOscillator(); lfo.frequency.value = 0.07;
+  const lg = audio.createGain(); lg.gain.value = 0.035;
+  lfo.connect(lg); lg.connect(gv.gain);
+  vento.connect(fv); fv.connect(gv); gv.connect(saida);
+  vento.start(); lfo.start();
+
+  const chiado = audio.createBufferSource(); chiado.buffer = bufRuido; chiado.loop = true;
+  const fc = audio.createBiquadFilter(); fc.type = "bandpass"; fc.frequency.value = 3200; fc.Q.value = 0.6;
+  estaticaGanho = audio.createGain(); estaticaGanho.gain.value = 0;
+  chiado.connect(fc); fc.connect(estaticaGanho); estaticaGanho.connect(saida);
+  chiado.start();
+
+  droneGanhos = [];
+  [[41.2, "sawtooth"], [55, "triangle"], [880, "sine"]].forEach(([f, tipo]) => {
+    const o = audio.createOscillator(); o.type = tipo; o.frequency.value = f;
+    const fil = audio.createBiquadFilter(); fil.type = "lowpass"; fil.frequency.value = f > 200 ? 2000 : 300;
+    const g = audio.createGain(); g.gain.value = 0;
+    o.connect(fil); fil.connect(g); g.connect(saida);
+    o.start();
+    droneGanhos.push(g);
+    ambiente.push(o);
+  });
+  ambiente.push(vento, lfo, chiado);
+}
+function pararAmbiente() {
+  ambiente.forEach(o => { try { o.stop(); } catch (e) {} });
+  ambiente = [];
+  if (estaticaGanho) estaticaGanho.gain.value = 0;
+  droneGanhos = [];
+}
+
+function atualizarSom(dt) {
+  if (!audio || estado !== "jogando") return;
+  const t = audio.currentTime;
+  if (estaticaGanho) estaticaGanho.gain.setTargetAtTime(estatica * 0.3, t, 0.05);
+  const n = nivelPerigo();
+  if (droneGanhos.length) {
+    droneGanhos[0].gain.setTargetAtTime(Math.min(0.06, n * 0.01), t, 1);
+    droneGanhos[1].gain.setTargetAtTime(n >= 3 ? 0.035 : 0, t, 1);
+    droneGanhos[2].gain.setTargetAtTime(n >= 5 ? 0.006 + Math.sin(t * 3) * 0.003 : 0, t, 0.3);
+  }
+  // grilos: param quando ele chega perto
+  const alvoGrilo = vulto.ativo ? Math.max(0, Math.min(1, (vulto.dist - 12) / 22)) : 1;
+  griloVol += (alvoGrilo * (fugindo ? 0.4 : 1) - griloVol) * Math.min(1, dt * 2);
+  tempoGrilo -= dt;
+  if (tempoGrilo <= 0) {
+    tempoGrilo = 0.35 + Math.random() * 1.1;
+    if (griloVol > 0.05) {
+      const pan = Math.random() * 2 - 1, f = 4200 + Math.random() * 600;
+      for (let i = 0; i < 3; i++) tom(f, 0.035, "sine", 0.012 * griloVol, i * 0.06, pan);
+    }
+  }
+  tempoCoruja -= dt;
+  if (tempoCoruja <= 0) {
+    tempoCoruja = 25 + Math.random() * 40;
+    const pan = Math.random() * 2 - 1;
+    tom(390, 0.35, "sine", 0.04, 0, pan, 0.9); tom(370, 0.55, "sine", 0.04, 0.45, pan, 0.9);
+  }
+  if (vulto.ativo && vulto.dist < 16) {
+    tempoCoracao -= dt;
+    if (tempoCoracao <= 0) { tempoCoracao = 0.4 + (vulto.dist / 16) * 0.7; batida(); }
+  }
+}
+
+// chiado na tela: um quadro de ruído que pula de lugar a cada frame
+const telaRuido = document.getElementById("ruido");
+(() => {
+  const g = telaRuido.getContext("2d"), img = g.createImageData(256, 256);
+  for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+  g.putImageData(img, 0, 0);
+  telaRuido.style.width = "calc(100% + 20px)"; telaRuido.style.height = "calc(100% + 20px)";
+})();
+function atualizarRuido() {
+  const base = estado === "pego" ? 0.55 : 0.06 + estatica * 0.75;
+  telaRuido.style.opacity = base * (0.8 + Math.random() * 0.4);
+  telaRuido.style.transform = `translate(${(Math.random() * 20) | 0}px, ${(Math.random() * 20) | 0}px) scale(${1 + Math.random() * 0.2})`;
+}
+
+// ===== HUD =====
+function atualizarHUD(dt) {
+  document.querySelector("#barraPilha span").style.width = `${jogador.bateria * 100}%`;
+  document.querySelector("#barraPilha span").style.background = jogador.bateria < 0.15 ? "#c0201a" : "#d8c890";
+  document.querySelector("#barraFolego span").style.width = `${jogador.folego * 100}%`;
+  if (tempoMensagem > 0) { tempoMensagem -= dt; if (tempoMensagem <= 0) document.getElementById("mensagem").style.opacity = 0; }
+}
+
+// ===== Controles =====
+document.addEventListener("keydown", e => {
+  teclas[e.code] = true;
+  if (e.code === "Space") e.preventDefault();
+  if (estado === "jogando") {
+    if (e.code === "KeyF") {
+      jogador.ligada = !jogador.ligada;
+      tom(1200, 0.03, "square", 0.04);
+    }
+    if (e.code === "KeyE") pegar();
+    if (e.code === "KeyP") pausar();
+  } else if (estado === "pausado" && e.code === "KeyP") continuar();
+});
+document.addEventListener("keyup", e => teclas[e.code] = false);
+document.addEventListener("mousemove", e => {
+  if (estado !== "jogando" || document.pointerLockElement !== renderer.domElement) return;
+  jogador.yaw -= e.movementX * 0.0022;
+  jogador.pitch = Math.max(-1.35, Math.min(1.35, jogador.pitch - e.movementY * 0.0022));
+});
+document.addEventListener("mousedown", () => {
+  if (estado === "jogando" && document.pointerLockElement !== renderer.domElement) travar();
+  else if (estado === "jogando") pegar();
+});
+document.addEventListener("pointerlockchange", () => { if (!document.pointerLockElement && estado === "jogando") pausar(); });
+
+function pausar() {
+  if (estado !== "jogando") return;
+  estado = "pausado";
+  teclas = {};
+  if (audio) audio.suspend();
+  mostrarTela("pausa");
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+function continuar() {
+  if (estado !== "pausado") return;
+  estado = "jogando";
+  if (audio) audio.resume();
+  mostrarTela(null);
+  travar();
+}
+function irMenu() {
+  estado = "menu";
+  if (audio) audio.resume();
+  pararAmbiente();
+  document.getElementById("hud").classList.add("escondido");
+  construirMundo();
+  mostrarTela("menu");
+}
+
+document.querySelectorAll("#opcoesDif .opcao").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("#opcoesDif .opcao").forEach(x => x.classList.remove("selecionada"));
+  b.classList.add("selecionada");
+  difEscolhida = b.dataset.dif;
+}));
+document.querySelectorAll("#opcoesGraficos .opcao").forEach(b => {
+  b.classList.toggle("selecionada", b.dataset.graficos === QUALIDADE);
+  b.addEventListener("click", () => {
+    if (b.dataset.graficos === QUALIDADE) return;
+    try { localStorage.setItem("fliperama_mata_graficos", b.dataset.graficos); } catch (e) {}
+    location.reload();
+  });
+});
+document.getElementById("botaoJogar").addEventListener("click", iniciar);
+document.getElementById("botaoDeNovo").addEventListener("click", iniciar);
+document.getElementById("botaoContinuar").addEventListener("click", continuar);
+document.getElementById("botaoMenuPausa").addEventListener("click", irMenu);
+document.getElementById("botaoMenuFim").addEventListener("click", irMenu);
+
+// ===== Laço principal =====
+let ultimo = performance.now();
+function laco(agora) {
+  requestAnimationFrame(laco);
+  const dt = Math.min(0.05, (agora - ultimo) / 1000);
+  ultimo = agora;
+
+  if (estado === "jogando") {
+    tempo += dt;
+    atualizarJogador(dt);
+    atualizarVulto(dt);
+    atualizarSom(dt);
+    atualizarHUD(dt);
+  } else if (estado === "pego") {
+    // susto: ele aparece colado no seu rosto
+    tempoSusto += dt;
+    const f = new THREE.Vector3(-Math.sin(jogador.yaw), 0, -Math.cos(jogador.yaw));
+    vultoMesh.grupo.visible = true;
+    vultoMesh.grupo.position.set(camera.position.x + f.x * 0.9, -1.45, camera.position.z + f.z * 0.9);
+    vultoMesh.grupo.rotation.y = Math.atan2(-f.x, -f.z);
+    vultoMesh.olhos.forEach(o => o.visible = true);
+    camera.rotation.set(0.02 + (Math.random() - 0.5) * 0.06, jogador.yaw + (Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.08);
+    lanterna.intensity = Math.random() < 0.5 ? 3 : 0.3;
+    document.getElementById("susto").style.opacity = 0.6 + Math.random() * 0.4;
+    if (tempoSusto > 1.6) mostrarDerrota();
+  } else if (estado === "menu") {
+    // menu: olhando a mata a partir do carro; às vezes ele está lá no fundo
+    const a = agora / 9000;
+    camera.position.set(CARRO.x + 1.5, 1.6, CARRO.z + 3);
+    camera.rotation.set(0.02, Math.PI + Math.sin(a) * 0.35, 0);
+    lanterna.intensity = 2.6;
+    const ciclo = (agora / 1000) % 14;
+    vultoMesh.grupo.visible = ciclo > 9 && ciclo < 11.5;
+    vultoMesh.grupo.position.set(CARRO.x + 4, 0, CARRO.z + 26);
+    vultoMesh.grupo.rotation.y = Math.PI;
+    vultoMesh.olhos.forEach(o => o.visible = true);
+  }
+  atualizarRuido();
+  renderer.render(cena, camera);
+}
+
+construirMundo();
+requestAnimationFrame(laco);
+</script>
+</body>
+</html>

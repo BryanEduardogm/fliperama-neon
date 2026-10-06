@@ -1,6 +1,6 @@
 # 🕹️ Fliperama Neon
 
-**14 jogos grátis que rodam direto no navegador** — sem cadastro e sem download.
+**16 jogos grátis que rodam direto no navegador** — sem cadastro e sem download.
 
 ▶️ **Jogue agora:** https://fliperama-neon.netlify.app/
 
@@ -12,6 +12,8 @@
 | Punho Neon | Luta 2D com modo história e **online com amigo** | PC |
 | Turbo Neon | Corrida synthwave com 6 pistas e **online com até 4 pilotos** | PC |
 | Neon Morto | Terror num fliperama abandonado (4 mapas) | PC |
+| Mata Escura | Terror numa floresta à noite: 6 páginas e o Vulto | PC |
+| Ilha Perdida | Sobrevivência numa ilha com tubarões, pesca e jangada | PC |
 | Mundo de Blocos | Construção 3D | PC |
 | Defesa Neon | Estratégia (tower defense): 5 torres, 3 mapas, 30 ondas | PC + celular |
 | Batida Neon | Ritmo com músicas geradas pelo navegador | PC + celular |
