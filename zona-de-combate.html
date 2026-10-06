@@ -341,6 +341,27 @@
   </div>
 
   <div class="secao">
+    <h2>GRÁFICOS</h2>
+    <div class="opcoes" id="opcoesGraficos">
+      <div class="cartao dificuldade" data-graficos="leve">
+        <div class="icone">🐢</div>
+        <h3>Leve</h3>
+        <p>O mais rápido. Para PC bem fraco.</p>
+      </div>
+      <div class="cartao dificuldade" data-graficos="medio">
+        <div class="icone">✨</div>
+        <h3>Médio</h3>
+        <p>Luz melhor, céu com sol e nuvens, efeitos.</p>
+      </div>
+      <div class="cartao dificuldade" data-graficos="alto">
+        <div class="icone">🔥</div>
+        <h3>Alto</h3>
+        <p>Sombras de verdade e bordas lisas. Mais pesado.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="secao">
     <h2>SENSIBILIDADE DO MOUSE</h2>
     <div class="painel-sens">
       <span title="Mais lento">🐢</span>
@@ -646,9 +667,38 @@ document.querySelectorAll("#opcoesDificuldade .cartao").forEach(c => c.addEventL
 }));
 
 
-// ===== Renderizador (configurado leve para notebooks sem placa de vídeo) =====
-const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
-renderer.setPixelRatio(1);
+// ===== Qualidade gráfica (fica salva; trocar recarrega a página) =====
+// leve: como era antes · medio: luz por pixel, céu, sol, nuvens e efeitos · alto: + sombras e bordas lisas
+// Sem escolha salva: começa no Médio, ou no Leve se o Chrome estiver desenhando sem placa de vídeo
+function semPlacaDeVideo() {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl");
+    if (!gl) return true;
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const nome = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "";
+    return /SwiftShader|Basic Render|llvmpipe|Software/i.test(nome);
+  } catch (e) { return false; }
+}
+const QUALIDADE = (() => {
+  try { const salvo = localStorage.getItem("zonaGraficos"); if (salvo) return salvo; } catch (e) {}
+  return semPlacaDeVideo() ? "leve" : "medio";
+})();
+document.querySelectorAll("#opcoesGraficos .cartao").forEach(c => {
+  c.classList.toggle("selecionado", c.dataset.graficos === QUALIDADE);
+  c.addEventListener("click", () => {
+    if (c.dataset.graficos === QUALIDADE) return;
+    try { localStorage.setItem("zonaGraficos", c.dataset.graficos); } catch (e) {}
+    location.reload(); // a suavização de bordas só pode ser ligada ao abrir o jogo
+  });
+});
+
+// ===== Renderizador (leve por padrão, para notebooks sem placa de vídeo) =====
+const renderer = new THREE.WebGLRenderer({ antialias: QUALIDADE === "alto", powerPreference: "high-performance" });
+renderer.setPixelRatio(QUALIDADE === "alto" ? Math.min(devicePixelRatio, 1.5) : 1);
+if (QUALIDADE === "alto") {
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+}
 renderer.setSize(innerWidth, innerHeight);
 renderer.autoClear = false;
 document.body.appendChild(renderer.domElement);
@@ -775,6 +825,7 @@ function material(nome, repX = 1, repY = 1, cor = 0xffffff) {
     const tex = TEXTURAS[nome].clone();
     tex.needsUpdate = true;
     tex.repeat.set(repX, repY);
+    tex.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), { leve: 1, medio: 4, alto: 8 }[QUALIDADE]);
     cacheMateriais[chave] = new THREE.MeshLambertMaterial({ map: tex, color: cor });
   }
   return cacheMateriais[chave];
@@ -850,12 +901,169 @@ function prepararCena(corCeu, corNevoa, nevoaPerto, nevoaLonge, texChao, repChao
   cena = new THREE.Scene();
   cena.background = new THREE.Color(corCeu);
   cena.fog = new THREE.Fog(corNevoa, nevoaPerto, nevoaLonge);
+  criarCeu(corCeu, corNevoa);
   solidos = []; colisores = []; bots = []; efeitos = []; furos = []; barris = [];
 
   chao = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), material(texChao, repChao, repChao));
   chao.rotation.x = -Math.PI / 2;
   cena.add(chao);
   cena.add(camera);
+}
+
+// ===== Gráficos melhores (céu, sol, nuvens, luz por pixel e sombras) =====
+let ceu = null, solSprite = null, nuvens = [];
+function texturaRedonda(tamanho, desenhar) {
+  const c = document.createElement("canvas");
+  c.width = c.height = tamanho;
+  desenhar(c.getContext("2d"), tamanho);
+  return new THREE.CanvasTexture(c);
+}
+const texBrilhoSol = texturaRedonda(128, (k, t) => {
+  const g = k.createRadialGradient(t / 2, t / 2, 0, t / 2, t / 2, t / 2);
+  g.addColorStop(0, "rgba(255,255,240,1)"); g.addColorStop(0.18, "rgba(255,245,210,0.95)");
+  g.addColorStop(0.35, "rgba(255,220,150,0.35)"); g.addColorStop(1, "rgba(255,200,120,0)");
+  k.fillStyle = g; k.fillRect(0, 0, t, t);
+});
+const texNuvem = texturaRedonda(128, (k, t) => {
+  for (let i = 0; i < 9; i++) { // várias bolinhas macias formam uma nuvem
+    const x = t * (0.2 + Math.random() * 0.6), y = t * (0.4 + Math.random() * 0.2), r = t * (0.12 + Math.random() * 0.14);
+    const g = k.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, "rgba(255,255,255,0.9)"); g.addColorStop(1, "rgba(255,255,255,0)");
+    k.fillStyle = g; k.fillRect(0, 0, t, t);
+  }
+});
+const texFumaca = texturaRedonda(64, (k, t) => {
+  const g = k.createRadialGradient(t / 2, t / 2, 0, t / 2, t / 2, t / 2);
+  g.addColorStop(0, "rgba(200,200,200,0.8)"); g.addColorStop(1, "rgba(200,200,200,0)");
+  k.fillStyle = g; k.fillRect(0, 0, t, t);
+});
+
+// Domo do céu: azul (ou a cor do mapa) em cima, clareando até a névoa no horizonte
+function criarCeu(corCeu, corNevoa) {
+  const topo = new THREE.Color(corCeu).multiplyScalar(0.72), horizonte = new THREE.Color(corNevoa), baixo = new THREE.Color(corNevoa).multiplyScalar(0.85);
+  const geo = new THREE.SphereGeometry(280, 24, 12);
+  const pos = geo.attributes.position, cores = [];
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i) / 280;
+    const c = y > 0 ? horizonte.clone().lerp(topo, Math.pow(y, 0.55)) : horizonte.clone().lerp(baixo, Math.min(1, -y * 3));
+    cores.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(cores, 3));
+  ceu = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
+  ceu.renderOrder = -1;
+  cena.add(ceu);
+  solSprite = null;
+  nuvens = [];
+}
+
+// Troca materiais simples por materiais com luz calculada em cada pixel (paredes deixam de ficar "chapadas")
+const cachePhong = new Map();
+function materialPhong(m, brilho = 14, especular = 0x151515) {
+  if (!m || !m.isMeshLambertMaterial) return m;
+  if (!cachePhong.has(m)) {
+    cachePhong.set(m, new THREE.MeshPhongMaterial({ color: m.color, map: m.map, transparent: m.transparent, opacity: m.opacity, side: m.side, shininess: brilho, specular: especular }));
+  }
+  return cachePhong.get(m);
+}
+const geoSombraBot = new THREE.CircleGeometry(0.55, 16);
+const matSombraBot = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false });
+
+function melhorarCena() {
+  if (QUALIDADE === "leve") return;
+  const luzesSol = [];
+  cena.traverse(o => { if (o.isDirectionalLight) luzesSol.push(o); });
+  // sol brilhando e nuvens passando (só nos mapas a céu aberto)
+  if (mapaEscolhido !== "armazem") {
+    const sol = luzesSol[0];
+    if (sol) {
+      solSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilhoSol, color: sol.color, blending: THREE.AdditiveBlending, fog: false, depthWrite: false, transparent: true }));
+      solSprite.scale.set(80, 80, 1);
+      solSprite.userData.dir = sol.position.clone().normalize();
+      cena.add(solSprite);
+    }
+    const corNuvem = new THREE.Color(0xffffff).lerp(cena.fog.color, 0.25);
+    for (let i = 0; i < 9; i++) {
+      const n = new THREE.Sprite(new THREE.SpriteMaterial({ map: texNuvem, color: corNuvem, fog: false, depthWrite: false, transparent: true, opacity: 0.6 }));
+      const a = Math.random() * Math.PI * 2, r = 120 + Math.random() * 90;
+      n.position.set(Math.cos(a) * r, 70 + Math.random() * 45, Math.sin(a) * r);
+      n.scale.set(70 + Math.random() * 60, 28 + Math.random() * 18, 1);
+      n.userData.vel = 1.5 + Math.random() * 2;
+      cena.add(n);
+      nuvens.push(n);
+    }
+  }
+  const alto = QUALIDADE === "alto";
+  cena.traverse(o => {
+    if (!o.isMesh || o === ceu) return;
+    o.material = Array.isArray(o.material) ? o.material.map(m => materialPhong(m)) : materialPhong(o.material);
+    if (alto && !o.material.transparent) { o.castShadow = true; o.receiveShadow = true; }
+  });
+  if (alto) {
+    // sombras de verdade vindas do sol
+    luzesSol.forEach(l => {
+      l.castShadow = true;
+      l.shadow.mapSize.set(2048, 2048);
+      const c = l.shadow.camera;
+      c.left = -45; c.right = 45; c.top = 45; c.bottom = -45; c.near = 1; c.far = 220;
+      c.updateProjectionMatrix();
+      l.shadow.bias = -0.0006;
+      l.shadow.normalBias = 0.03;
+    });
+  } else {
+    // no médio: uma sombrinha redonda embaixo de cada bot (quase não pesa)
+    bots.forEach(b => {
+      const sombra = new THREE.Mesh(geoSombraBot, matSombraBot);
+      sombra.rotation.x = -Math.PI / 2;
+      sombra.position.y = 0.03;
+      b.grupo.add(sombra);
+    });
+  }
+}
+
+// Armas na mão com metal brilhando
+const cachePhongArma = new Map();
+function melhorarArmas() {
+  if (QUALIDADE === "leve") return;
+  cenaArma.traverse(o => {
+    if (!o.isMesh || !o.material || !o.material.isMeshLambertMaterial) return;
+    const m = o.material;
+    if (!cachePhongArma.has(m)) cachePhongArma.set(m, new THREE.MeshPhongMaterial({ color: m.color, map: m.map, shininess: 70, specular: 0x555555 }));
+    o.material = cachePhongArma.get(m);
+  });
+}
+
+// Fumacinha onde a bala bate
+function fumaca(ponto) {
+  if (QUALIDADE === "leve") return;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: texFumaca, color: 0xb8b0a8, transparent: true, opacity: 0.55, depthWrite: false }));
+  s.position.copy(ponto);
+  s.scale.set(0.3, 0.3, 1);
+  cena.add(s);
+  efeitos.push({ mesh: s, vida: 0.8, max: 0.8, fumaca: true });
+}
+
+// Clarão de luz do tiro iluminando as paredes em volta
+const luzDisparo = QUALIDADE === "leve" ? null : new THREE.PointLight(0xffc070, 0, 14, 2);
+if (luzDisparo) { luzDisparo.position.set(0.3, -0.2, -1.2); camera.add(luzDisparo); }
+
+// Se o jogo ficar lento com gráficos Médio/Alto, sugere trocar para Leve (uma vez só)
+let mediaQuadroGraf = 1 / 60, avisouGraficos = false, tempoMedindo = 0;
+function vigiarDesempenho(dt) {
+  if (QUALIDADE === "leve" || avisouGraficos || estado !== "jogando") return;
+  tempoMedindo += dt;
+  mediaQuadroGraf = mediaQuadroGraf * 0.97 + dt * 0.03;
+  if (tempoMedindo > 6 && mediaQuadroGraf > 1 / 35) {
+    avisouGraficos = true;
+    mostrarAviso("JOGO LENTO? TROQUE OS GRÁFICOS PARA LEVE NO MENU", 6000);
+  }
+}
+
+function atualizarCeu(dt) {
+  vigiarDesempenho(dt);
+  if (ceu) ceu.position.copy(camera.position);
+  if (solSprite) solSprite.position.copy(camera.position).addScaledVector(solSprite.userData.dir, 250);
+  nuvens.forEach(n => { n.position.x += n.userData.vel * dt; if (n.position.x > 230) n.position.x = -230; });
+  if (luzDisparo) luzDisparo.intensity = Math.max(0, luzDisparo.intensity - dt * 45);
 }
 
 function bordas(altura, tex) {
@@ -1582,6 +1790,7 @@ ORDEM_ARMAS.forEach(id => {
   modelos[id].visible = false;
   cenaArma.add(modelos[id]);
 });
+melhorarArmas();
 
 // Troca o modelo de um tipo de arma (usado no menu e no Arsenal)
 function trocarModelo(tipo, indice) {
@@ -1590,6 +1799,7 @@ function trocarModelo(tipo, indice) {
   modelos[tipo] = criarModeloArma(ARMAS[tipo].modelo);
   modelos[tipo].visible = false;
   cenaArma.add(modelos[tipo]);
+  melhorarArmas();
 }
 
 desenharClasses();
@@ -1753,6 +1963,7 @@ function iniciarRodada(novaPartida) {
     const p = longe[Math.floor(Math.random() * longe.length)] || pontosRota[i];
     criarBot(p.clone(), nomes[i % nomes.length], i === 0 ? "soldado" : sortearTipoBot());
   }
+  melhorarCena();
 
   trocarArma(armaAtual, true);
   document.getElementById("feed").innerHTML = "";
@@ -1895,6 +2106,7 @@ function atirar() {
       if (hit.object.userData.barril) ferirBarril(hit.object, a.dano);
       marcaDeTiro(hit);
       particulas(hit.point, 0xffd080, 3);
+      fumaca(hit.point);
     }
   }
 
@@ -1916,6 +2128,7 @@ function atirar() {
   const clarao = modelos[armaAtual].userData.clarao;
   clarao.visible = true;
   clarao.material.rotation = Math.random() * Math.PI;
+  if (luzDisparo) luzDisparo.intensity = 2.4;
   setTimeout(() => clarao.visible = false, 45);
   somTiro(a.som || armaAtual, 1);
 
@@ -2461,12 +2674,19 @@ function atualizarEfeitos(dt) {
       e.mesh.scale.setScalar(1 + (1 - e.vida / e.max) * 3.5);
       e.mesh.material.opacity = Math.max(0, e.vida / e.max) * 0.9;
     }
+    if (e.fumaca) {
+      const k = 1 - e.vida / e.max;
+      e.mesh.position.y += 0.5 * dt;
+      e.mesh.scale.set(0.3 + k * 1.1, 0.3 + k * 1.1, 1);
+      e.mesh.material.opacity = Math.max(0, e.vida / e.max) * 0.55;
+    }
     if (e.vel) {
       e.vel.y -= 9 * dt;
       e.mesh.position.addScaledVector(e.vel, dt);
     }
     if (e.vida <= 0) {
       cena.remove(e.mesh);
+      if (e.fumaca) e.mesh.material.dispose();
       if (e.linha) { e.mesh.geometry.dispose(); e.mesh.material.dispose(); }
       efeitos.splice(i, 1);
     }
@@ -2808,6 +3028,7 @@ function laco(agora) {
 
   renderer.clear();
   if (cena && estado !== "menu") {
+    atualizarCeu(dt);
     renderer.render(cena, camera);
     renderer.clearDepth();
     if (estado === "jogando" || estado === "pausado" || estado === "arsenal") renderer.render(cenaArma, cameraArma);
