@@ -99,6 +99,7 @@
   <div class="menu-botoes">
     <button class="botao" data-ir="modo">▶ JOGAR</button>
     <button class="botao azul" data-ir="historia">⚔ MODO HISTÓRIA</button>
+    <button class="botao" data-ir="online" style="background: linear-gradient(90deg, #39ff88, #00b070); box-shadow: 0 0 20px rgba(57,255,136,0.4), 0 5px 0 #0a5a30; text-shadow: 2px 2px 0 #0a5a30;">🌐 ONLINE COM AMIGO</button>
     <button class="botao sec" data-ir="controles">🎮 CONTROLES</button>
   </div>
   <div class="piscando">APERTE JOGAR</div>
@@ -113,6 +114,29 @@
     <button class="botao azul" id="botao2p">👥 2 JOGADORES (mesmo teclado)</button>
     <button class="botao sec" data-ir="titulo">← VOLTAR</button>
   </div>
+</div>
+
+<!-- ===== Online ===== -->
+<div class="tela escura escondida" id="telaOnline">
+  <div class="titulo-tela">🌐 ONLINE COM UM AMIGO</div>
+  <p class="dica" style="max-width: 600px">Cada um joga no seu computador. Um cria a sala e manda o código para o outro (pelo WhatsApp, por exemplo).</p>
+  <div class="menu-botoes" id="onlineInicio">
+    <button class="botao" id="botaoCriarSala">CRIAR SALA</button>
+    <div style="display:flex; gap:8px">
+      <input id="campoCodigo" maxlength="5" placeholder="CÓDIGO" autocomplete="off"
+        style="flex:1; min-width:0; font-family: var(--titulo); font-size: 1.1rem; text-transform: uppercase; text-align:center; padding: 12px; border-radius: 10px; border: 2px solid var(--borda); background: #0a0618; color: var(--amarelo);">
+      <button class="botao azul" id="botaoEntrarSala">ENTRAR</button>
+    </div>
+    <button class="botao sec" data-ir="titulo">← VOLTAR</button>
+  </div>
+  <div id="onlineEspera" style="display:none; flex-direction:column; align-items:center; gap:14px">
+    <div class="dica">CÓDIGO DA SALA</div>
+    <div id="codigoSala" style="font-family: var(--titulo); font-size: 2.6rem; color: var(--amarelo); letter-spacing: 8px; text-shadow: 0 0 16px var(--amarelo);"></div>
+    <button class="botao sec" id="botaoCopiar">📋 COPIAR CÓDIGO</button>
+    <div class="piscando" id="statusOnline">AGUARDANDO SEU AMIGO…</div>
+    <button class="botao sec" id="botaoCancelarSala">CANCELAR</button>
+  </div>
+  <div class="dica" id="erroOnline" style="color: var(--vermelho)"></div>
 </div>
 
 <!-- ===== Controles ===== -->
@@ -934,10 +958,10 @@ addEventListener("keydown", e => {
   if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Slash"].includes(e.code)) e.preventDefault();
   if (!e.repeat) apertou.add(e.code);
   teclas[e.code] = true;
-  if (e.code === "KeyP" && (estadoLuta === "luta" || estadoLuta === "contagem")) pausar();
+  if (e.code === "KeyP" && modo !== "online" && (estadoLuta === "luta" || estadoLuta === "contagem")) pausar();
 });
 addEventListener("keyup", e => { teclas[e.code] = false; });
-addEventListener("blur", () => { for (const k in teclas) teclas[k] = false; if (estadoLuta === "luta") pausar(); });
+addEventListener("blur", () => { for (const k in teclas) teclas[k] = false; if (estadoLuta === "luta" && modo !== "online") pausar(); });
 
 const MAPAS_TECLAS = {
   p1: { esq: ["KeyA"], dir: ["KeyD"], pulo: ["KeyW"], defesa: ["KeyS"], soco: ["KeyJ"], chute: ["KeyK"], especial: ["KeyL"] },
@@ -977,7 +1001,7 @@ function novoLutador(id, lado, controle) {
 
 function iniciarPartida() {
   ctxAudio();
-  const controle2 = modo === "2p" ? "p2" : "cpu";
+  const controle2 = modo === "2p" ? "p2" : modo === "online" ? "rede" : "cpu";
   lutadores = [novoLutador(escolhaP1, -1, modo === "2p" ? "p1" : "p1solo"), novoLutador(escolhaP2, 1, controle2)];
   palcoAtual = arenaEscolhida === "auto" ? PERSONAGENS[escolhaP2].palco : arenaEscolhida;
   round = 1;
@@ -1042,7 +1066,7 @@ function comecarEspecial(f) {
   if (e.tipo === "teleporte") f.golpe = { ...base, inicio: 0.28, ativo: 0.14, fim: 0.25, pose: "soco", alcance: 80, alto: 120, altura: 70, atordoa: 0.45, empurra: 300, teleportou: false };
   f.golpe.total = f.golpe.inicio + f.golpe.ativo + f.golpe.fim;
   somEspecial();
-  textosFlutuantes.push({ texto: e.nome.toUpperCase() + "!", x: f.x, y: f.y - 200 * f.p.escala, vida: 0.9, cor: "#ffe600" });
+  textoFlutuante({ texto: e.nome.toUpperCase() + "!", x: f.x, y: f.y - 200 * f.p.escala, vida: 0.9, cor: "#ffe600" });
   return true;
 }
 
@@ -1178,7 +1202,7 @@ function contarCombo(f) {
   const agora = performance.now();
   f.combo = (agora - (f.ultimoGolpe || 0) < 900) ? (f.combo || 1) + 1 : 1;
   f.ultimoGolpe = agora;
-  if (f.combo >= 3) textosFlutuantes.push({ texto: `${f.combo} HITS!`, x: f.x, y: f.y - 220, vida: 0.8, cor: "#ff2bd6" });
+  if (f.combo >= 3) textoFlutuante({ texto: `${f.combo} HITS!`, x: f.x, y: f.y - 220, vida: 0.8, cor: "#ff2bd6" });
 }
 
 function nocaute(vencedor, perdedor) {
@@ -1290,8 +1314,8 @@ function atualizarLuta(dtReal) {
   }
 
   const [a, b] = lutadores;
-  const ca = a.controle === "cpu" ? controleCpu(a, b, dt) : lerControle(MAPAS_TECLAS[a.controle]);
-  const cb = b.controle === "cpu" ? controleCpu(b, a, dt) : lerControle(MAPAS_TECLAS[b.controle]);
+  const ler = (f, o) => f.controle === "cpu" ? controleCpu(f, o, dt) : f.controle === "rede" ? consumirEntradaRede() : lerControle(MAPAS_TECLAS[f.controle]);
+  const ca = ler(a, b), cb = ler(b, a);
   atualizarLutador(a, b, dt, ca);
   atualizarLutador(b, a, dt, cb);
   // não deixa um atravessar o outro
@@ -1305,10 +1329,7 @@ function atualizarLuta(dtReal) {
     }
   }
   atualizarProjeteis(dt);
-  faiscas.forEach(fa => { fa.vida -= dt; if (fa.vx !== undefined) { fa.x += fa.vx * dt; fa.y += fa.vy * dt; fa.vy += 600 * dt; } });
-  faiscas = faiscas.filter(fa => fa.vida > 0);
-  textosFlutuantes.forEach(tx => { tx.vida -= dt; tx.y -= 40 * dt; });
-  textosFlutuantes = textosFlutuantes.filter(tx => tx.vida > 0);
+  atualizarVisuais(dt);
 
   if (estadoLuta === "ko" && tempoEstado > 1.6) {
     camLenta = 1;
@@ -1318,6 +1339,14 @@ function atualizarLuta(dtReal) {
   if (estadoLuta === "fimRound" && tempoEstado > 2.2) proximoRound();
 }
 let ultimaContagem = 4;
+
+function atualizarVisuais(dt) {
+  faiscas.forEach(fa => { fa.vida -= dt; if (fa.vx !== undefined) { fa.x += fa.vx * dt; fa.y += fa.vy * dt; fa.vy += 600 * dt; } });
+  faiscas = faiscas.filter(fa => fa.vida > 0);
+  textosFlutuantes.forEach(tx => { tx.vida -= dt; tx.y -= 40 * dt; });
+  textosFlutuantes = textosFlutuantes.filter(tx => tx.vida > 0);
+}
+function textoFlutuante(t) { textosFlutuantes.push(t); }
 
 function fimPorTempo() {
   const [a, b] = lutadores;
@@ -1355,6 +1384,7 @@ function fimDePartida(vencedor) {
     try { localStorage.setItem("fliperama_punho", (Number(localStorage.getItem("fliperama_punho")) || 0) + 1); } catch (e) {}
   }
   if (modo === "historia") return fimLutaHistoria(p1Venceu);
+  if (modo === "online") return fimPartidaOnline(lutadores.indexOf(vencedor));
   const titulo = document.getElementById("tituloResultado");
   titulo.innerHTML = modo === "2p" ? `${vencedor.p.nome} <span>VENCEU!</span>` : (p1Venceu ? "VOCÊ <span>VENCEU!</span>" : "VOCÊ <span>PERDEU</span>");
   document.getElementById("textoResultado").textContent = `${lutadores[0].p.nome} ${lutadores[0].vitorias} × ${lutadores[1].vitorias} ${lutadores[1].p.nome}`;
@@ -1426,7 +1456,7 @@ function telaHistoria(titulo, texto, listaBotoes) {
 }
 
 // ===== Telas e menus =====
-const TELAS = ["telaTitulo", "telaModo", "telaControles", "telaSelecao", "telaHistoria", "telaPausa", "telaResultado"];
+const TELAS = ["telaTitulo", "telaModo", "telaControles", "telaSelecao", "telaHistoria", "telaPausa", "telaResultado", "telaOnline"];
 function mostrarTela(id) { TELAS.forEach(t => document.getElementById(t).classList.toggle("escondida", t !== id)); }
 function garantirMusicaMenu() {
   ctxAudio();
@@ -1472,6 +1502,8 @@ document.querySelectorAll("[data-ir]").forEach(b => b.addEventListener("click", 
   if (ir === "modo") mostrarTela("telaModo");
   if (ir === "controles") mostrarTela("telaControles");
   if (ir === "historia") abrirSelecao("historia");
+  if (ir === "online") abrirOnline();
+  if (ir === "titulo") encerrarRede();
 }));
 document.getElementById("botaoCpu").onclick = () => { bip(700, 0.05, 0.08); abrirSelecao("cpu"); };
 document.getElementById("botao2p").onclick = () => { bip(700, 0.05, 0.08); abrirSelecao("2p"); };
@@ -1483,11 +1515,14 @@ function abrirSelecao(novoModo) {
   escolhendo = "p1";
   if (modo !== "historia") historia = null;
   document.getElementById("tituloSelecao").textContent = modo === "historia" ? "MODO HISTÓRIA · ESCOLHA SEU LUTADOR" : "ESCOLHA SEU LUTADOR";
-  document.getElementById("rotuloP2").textContent = modo === "2p" ? "JOGADOR 2" : modo === "historia" ? "SEU DESAFIO" : "COMPUTADOR";
-  document.getElementById("blocoArena").style.display = modo === "historia" ? "none" : "";
+  document.getElementById("rotuloP1").textContent = modo === "online" ? "VOCÊ" : "JOGADOR 1";
+  document.getElementById("rotuloP2").textContent = modo === "2p" ? "JOGADOR 2" : modo === "historia" ? "SEU DESAFIO" : modo === "online" ? "SEU AMIGO" : "COMPUTADOR";
+  document.getElementById("blocoArena").style.display = modo === "historia" || (modo === "online" && !rede.host) ? "none" : "";
+  document.getElementById("botaoLutar").textContent = modo === "online" ? "ESTOU PRONTO!" : "LUTAR!";
   document.getElementById("blocoDif").style.display = modo === "cpu" ? "" : "none";
   document.getElementById("dicaSelecao").textContent = modo === "2p"
     ? "Jogador 1 escolhe primeiro (clique ou A/D/W/S + J). Depois o Jogador 2 (clique ou setas + vírgula)."
+    : modo === "online" ? (rede.host ? "Escolha seu lutador e a arena. A luta começa quando os dois estiverem prontos." : "Escolha seu lutador. Quem criou a sala escolhe a arena.")
     : "Clique num lutador (ou use A/D/W/S e J)";
   if (modo === "historia" && escolhaP1 === "sombra") escolhaP1 = "kenzo";
   if (modo === "cpu") escolhaP2 = ORDEM.filter(o => o !== escolhaP1)[Math.floor(Math.random() * 5)];
@@ -1517,7 +1552,7 @@ function montarSelecao() {
   const caixa = document.getElementById("opcoesArena");
   caixa.innerHTML = [["auto", "Casa do oponente"], ...Object.entries(PALCOS).map(([id, pl]) => [id, pl.nome])].map(([id, nome]) =>
     `<button class="opcao ${arenaEscolhida === id ? "selecionada" : ""}" data-arena="${id}">${nome}</button>`).join("");
-  caixa.querySelectorAll("button").forEach(b => b.onclick = () => { arenaEscolhida = b.dataset.arena; montarSelecao(); });
+  caixa.querySelectorAll("button").forEach(b => b.onclick = () => { arenaEscolhida = b.dataset.arena; if (modo === "online") enviar({ tipo: "escolha", id: escolhaP1, pronto: rede.euPronto, arena: arenaEscolhida }); montarSelecao(); });
   document.querySelectorAll("#opcoesDif .opcao").forEach(b => b.classList.toggle("selecionada", b.dataset.dif === difEscolhida));
   preencherLado("P1", escolhaP1);
   if (modo === "historia") {
@@ -1541,6 +1576,13 @@ function preencherLado(lado, id) {
 
 function escolher(id) {
   bip(880, 0.06, 0.1);
+  if (modo === "online") {
+    escolhaP1 = id; rede.euPronto = false;
+    enviar({ tipo: "escolha", id, pronto: false });
+    atualizarProntos();
+    montarSelecao();
+    return;
+  }
   if (modo === "2p" && escolhendo === "p2") { escolhaP2 = id; }
   else {
     escolhaP1 = id;
@@ -1552,6 +1594,7 @@ function escolher(id) {
 
 document.getElementById("botaoLutar").onclick = () => {
   ctxAudio(); bip(1040, 0.1, 0.12);
+  if (modo === "online") { rede.euPronto = !rede.euPronto; enviar({ tipo: "escolha", id: escolhaP1, pronto: rede.euPronto, arena: arenaEscolhida }); atualizarProntos(); return; }
   if (modo === "historia") iniciarHistoria(escolhaP1);
   else iniciarPartida();
 };
@@ -1568,6 +1611,7 @@ addEventListener("keydown", e => {
     if (quem === "p2") escolhaP2 = ORDEM[i]; else escolhaP1 = ORDEM[i];
     if (modo === "cpu" && escolhaP1 === escolhaP2) escolhaP2 = ORDEM.filter(o => o !== escolhaP1)[0];
     bip(600, 0.03, 0.06);
+    if (modo === "online") { rede.euPronto = false; enviar({ tipo: "escolha", id: escolhaP1, pronto: false }); atualizarProntos(); }
     montarSelecao();
   }
   if ((quem === "p1" && (e.code === "KeyJ" || e.code === "Enter")) || (quem === "p2" && (e.code === "Comma" || e.code === "Numpad1" || e.code === "Enter"))) {
@@ -1696,6 +1740,13 @@ function desenharLuta(t) {
       ctx.restore();
     }
   });
+  if (modo === "online" && rede.conexao) {
+    const meu = lutadores[rede.host ? 0 : 1];
+    const y = meu.y - 200 * meu.p.escala - 18 + Math.sin(t * 5) * 4;
+    ctx.font = "11px 'Press Start 2P', monospace"; ctx.textAlign = "center";
+    ctx.fillStyle = "#000"; ctx.fillText("VOCÊ ▼", meu.x + 2, y + 2);
+    ctx.fillStyle = "#39ff88"; ctx.fillText("VOCÊ ▼", meu.x, y);
+  }
   projeteis.forEach(desenharProjetil);
   // faíscas
   faiscas.forEach(fa => {
@@ -1743,6 +1794,270 @@ function desenharPrevia(c, id, lado, t) {
   desenharLutador(c, p, 100, 205, lado, obterPose("parado", t), t, { zoom: 1.05 / p.escala });
 }
 
+// ===== Modo online (PeerJS: os dois navegadores se conectam direto) =====
+// Quem cria a sala é o "anfitrião": o computador dele calcula a luta.
+// O convidado manda só os botões que aperta e recebe a luta pronta para desenhar.
+const PREFIXO_SALA = "fliperama-punho-neon-";
+const rede = { peer: null, conexao: null, host: false, euPronto: false, amigoPronto: false, amigo: "luna", eventos: [], entrada: null, pendentes: {}, enviando: false };
+
+function carregarPeerJS() {
+  if (window.Peer) return Promise.resolve();
+  return new Promise((ok, falha) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js";
+    sc.onload = ok;
+    sc.onerror = () => falha(new Error("Não deu para carregar o PeerJS. Confira a internet."));
+    document.head.appendChild(sc);
+  });
+}
+
+function abrirOnline() {
+  encerrarRede();
+  document.getElementById("onlineInicio").style.display = "";
+  document.getElementById("onlineEspera").style.display = "none";
+  document.getElementById("erroOnline").textContent = "";
+  mostrarTela("telaOnline");
+}
+
+function erroOnline(msg) {
+  document.getElementById("erroOnline").textContent = msg;
+  document.getElementById("onlineInicio").style.display = "";
+  document.getElementById("onlineEspera").style.display = "none";
+}
+
+function gerarCodigo() {
+  const letras = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sem O/0 e I/1, que se confundem
+  return Array.from({ length: 5 }, () => letras[Math.floor(Math.random() * letras.length)]).join("");
+}
+
+async function criarSala(tentativa = 0) {
+  document.getElementById("erroOnline").textContent = "";
+  try { await carregarPeerJS(); } catch (e) { return erroOnline(e.message); }
+  const codigo = gerarCodigo();
+  rede.host = true;
+  rede.peer = new Peer(PREFIXO_SALA + codigo);
+  document.getElementById("onlineInicio").style.display = "none";
+  document.getElementById("onlineEspera").style.display = "flex";
+  document.getElementById("codigoSala").textContent = codigo;
+  document.getElementById("statusOnline").textContent = "CONECTANDO…";
+  rede.peer.on("open", () => { document.getElementById("statusOnline").textContent = "AGUARDANDO SEU AMIGO…"; });
+  rede.peer.on("connection", conn => {
+    if (rede.conexao) { conn.on("open", () => conn.close()); return; } // sala cheia
+    prepararConexao(conn);
+  });
+  rede.peer.on("error", err => {
+    if (err.type === "unavailable-id" && tentativa < 3) { encerrarRede(); return criarSala(tentativa + 1); }
+    erroOnline("Erro na conexão: " + (err.type || err.message));
+  });
+}
+
+async function entrarSala() {
+  const codigo = document.getElementById("campoCodigo").value.trim().toUpperCase();
+  if (codigo.length !== 5) return erroOnline("Digite o código de 5 letras que seu amigo te mandou.");
+  document.getElementById("erroOnline").textContent = "";
+  try { await carregarPeerJS(); } catch (e) { return erroOnline(e.message); }
+  rede.host = false;
+  rede.peer = new Peer();
+  document.getElementById("onlineInicio").style.display = "none";
+  document.getElementById("onlineEspera").style.display = "flex";
+  document.getElementById("codigoSala").textContent = codigo;
+  document.getElementById("statusOnline").textContent = "PROCURANDO A SALA…";
+  const desistir = setTimeout(() => { if (!rede.conexao || !rede.conexao.open) { encerrarRede(); erroOnline("Não achei essa sala. Confira o código ou peça para seu amigo criar outra."); } }, 15000);
+  rede.peer.on("open", () => {
+    const conn = rede.peer.connect(PREFIXO_SALA + codigo, { reliable: true });
+    prepararConexao(conn, () => clearTimeout(desistir));
+  });
+  rede.peer.on("error", err => {
+    clearTimeout(desistir);
+    erroOnline(err.type === "peer-unavailable" ? "Não achei essa sala. Confira o código." : "Erro na conexão: " + (err.type || err.message));
+    encerrarRede();
+  });
+}
+
+function prepararConexao(conn, aoAbrir) {
+  rede.conexao = conn;
+  conn.on("open", () => {
+    if (aoAbrir) aoAbrir();
+    bip(880, 0.1, 0.12); bip(1320, 0.15, 0.12);
+    rede.euPronto = rede.amigoPronto = false;
+    abrirSelecao("online");
+    enviar({ tipo: "escolha", id: escolhaP1, pronto: false, arena: arenaEscolhida });
+  });
+  conn.on("data", receber);
+  conn.on("close", () => amigoSaiu());
+  conn.on("error", () => amigoSaiu());
+}
+
+function enviar(msg) { if (rede.conexao && rede.conexao.open) rede.conexao.send(msg); }
+
+function encerrarRede() {
+  if (rede.conexao) { try { rede.conexao.close(); } catch (e) {} }
+  if (rede.peer) { try { rede.peer.destroy(); } catch (e) {} }
+  rede.conexao = null; rede.peer = null; rede.euPronto = rede.amigoPronto = false;
+}
+
+function amigoSaiu() {
+  if (!rede.conexao) return;
+  rede.conexao = null;
+  encerrarRede();
+  if (modo !== "online") return;
+  estadoLuta = "nenhum"; lutadores = [];
+  pararMusica();
+  document.getElementById("tituloResultado").innerHTML = "CONEXÃO <span>PERDIDA</span>";
+  document.getElementById("textoResultado").textContent = "Seu amigo saiu da sala ou a internet caiu.";
+  botoes("botoesResultado", [["MENU", "", () => irTitulo()]]);
+  mostrarTela("telaResultado");
+}
+
+function atualizarProntos() {
+  const b = document.getElementById("botaoLutar");
+  b.textContent = rede.euPronto ? "✔ PRONTO! (esperando)" : "ESTOU PRONTO!";
+  document.getElementById("rotuloP2").textContent = rede.amigoPronto ? "SEU AMIGO · ✔ PRONTO" : "SEU AMIGO · escolhendo…";
+  // o anfitrião começa a luta quando os dois estiverem prontos
+  if (rede.host && rede.euPronto && rede.amigoPronto) comecarOnline();
+}
+
+function comecarOnline() {
+  rede.euPronto = rede.amigoPronto = false;
+  const arena = arenaEscolhida === "auto" ? PERSONAGENS[rede.amigo].palco : arenaEscolhida;
+  const dados = { tipo: "iniciar", p1: escolhaP1, p2: rede.amigo, arena };
+  enviar(dados);
+  iniciarOnline(dados);
+}
+
+function iniciarOnline(d) {
+  modo = "online";
+  ctxAudio();
+  lutadores = [novoLutador(d.p1, -1, rede.host ? "p1solo" : "remoto"), novoLutador(d.p2, 1, rede.host ? "rede" : "remoto")];
+  palcoAtual = d.arena;
+  round = 1;
+  rede.pendentes = {}; rede.entrada = null; rede.eventos = [];
+  faiscas = []; textosFlutuantes = []; projeteis = [];
+  mostrarTela(null);
+  tocarMusica(palcoAtual, 1);
+  if (rede.host) iniciarRound();
+  else { estadoLuta = "apresentacao"; relogio = 60; }
+}
+
+function receber(msg) {
+  if (msg.tipo === "escolha") {
+    rede.amigo = msg.id; rede.amigoPronto = msg.pronto;
+    if (!rede.host && msg.arena) arenaEscolhida = msg.arena;
+    if (modo === "online" && !document.getElementById("telaSelecao").classList.contains("escondida")) { escolhaP2 = msg.id; montarSelecao(); atualizarProntos(); }
+  }
+  if (msg.tipo === "iniciar" && !rede.host) iniciarOnline(msg);
+  if (msg.tipo === "controle" && rede.host) {
+    rede.entrada = msg.c;
+    ["pulo", "soco", "chute", "especial"].forEach(k => { if (msg.c[k]) rede.pendentes[k] = true; });
+  }
+  if (msg.tipo === "estado" && !rede.host) aplicarEstado(msg);
+  if (msg.tipo === "fim" && !rede.host) mostrarFimOnline(msg);
+  if (msg.tipo === "revanche") { if (rede.host) comecarRevanche(); }
+  if (msg.tipo === "selecao") voltarSelecaoOnline(false);
+}
+
+// anfitrião: usa os botões que o amigo mandou (os "apertos" valem até serem usados)
+function consumirEntradaRede() {
+  const e = rede.entrada || {};
+  const c = { esq: !!e.esq, dir: !!e.dir, defesa: !!e.defesa, pulo: !!rede.pendentes.pulo, soco: !!rede.pendentes.soco, chute: !!rede.pendentes.chute, especial: !!rede.pendentes.especial };
+  rede.pendentes = {};
+  return c;
+}
+
+// convidado: manda os botões a cada quadro
+function enviarControles() {
+  if (estadoLuta === "nenhum") return;
+  enviar({ tipo: "controle", c: lerControle(MAPAS_TECLAS.p1solo) });
+}
+
+// anfitrião: grava sons e efeitos para o amigo ver e ouvir também
+function gravarEvento(nome, args) { if (modo === "online" && rede.host && rede.conexao && estadoLuta !== "nenhum") rede.eventos.push([nome, ...args]); }
+const ORIGINAIS = { somGolpe, bip, somEspecial, falar, faiscasEm, poeira, anunciar, textoFlutuante };
+somGolpe = (...a) => { gravarEvento("somGolpe", a); ORIGINAIS.somGolpe(...a); };
+bip = (...a) => { gravarEvento("bip", a); ORIGINAIS.bip(...a); };
+somEspecial = (...a) => { gravarEvento("somEspecial", a); ORIGINAIS.somEspecial(...a); };
+falar = (...a) => { gravarEvento("falar", a); ORIGINAIS.falar(...a); };
+faiscasEm = (...a) => { gravarEvento("faiscasEm", a); ORIGINAIS.faiscasEm(...a); };
+poeira = (...a) => { gravarEvento("poeira", a); ORIGINAIS.poeira(...a); };
+anunciar = (...a) => { gravarEvento("anunciar", a); ORIGINAIS.anunciar(...a); };
+textoFlutuante = (...a) => { gravarEvento("textoFlutuante", a); ORIGINAIS.textoFlutuante(...a); };
+
+const r1 = v => Math.round(v * 10) / 10;
+function enviarEstado() {
+  if (!rede.conexao || !rede.conexao.open) return;
+  enviar({
+    tipo: "estado", el: estadoLuta, te: r1(tempoEstado), rl: r1(relogio), rd: round, tr: r1(tremor),
+    l: lutadores.map(f => ({
+      x: r1(f.x), y: r1(f.y), ld: f.lado, v: r1(f.vida), va: r1(f.vidaAtraso), e: r1(f.energia), vi: f.vitorias,
+      s: f.estado, t: Math.round(f.tempo * 1000) / 1000, nc: f.noChao, an: r1(f.anim), tp: r1(f.transparencia), pi: f.piscar > 0 ? 1 : 0,
+      g: f.golpe ? { p: f.golpe.pose, i: f.golpe.inicio, a: f.golpe.ativo, f: f.golpe.fim } : null
+    })),
+    pr: projeteis.map(pr => ({ x: r1(pr.x), y: r1(pr.y), vx: pr.vx, c: pr.cor, r: pr.raio, fo: pr.forma })),
+    ev: rede.eventos
+  });
+  rede.eventos = [];
+}
+
+// convidado: copia a luta que chegou do anfitrião
+function aplicarEstado(m) {
+  if (!lutadores.length) return;
+  estadoLuta = m.el; tempoEstado = m.te; relogio = m.rl; round = m.rd;
+  if (m.tr > tremor) tremor = m.tr;
+  m.l.forEach((d, i) => {
+    const f = lutadores[i];
+    Object.assign(f, { x: d.x, y: d.y, lado: d.ld, vida: d.v, vidaAtraso: d.va, energia: d.e, vitorias: d.vi, estado: d.s, tempo: d.t, noChao: d.nc, anim: d.an, transparencia: d.tp, piscar: d.pi ? 0.05 : 0 });
+    f.golpe = d.g ? { pose: d.g.p, inicio: d.g.i, ativo: d.g.a, fim: d.g.f } : null;
+  });
+  projeteis = m.pr.map(p => ({ x: p.x, y: p.y, vx: p.vx, cor: p.c, raio: p.r, forma: p.fo }));
+  m.ev.forEach(([nome, ...args]) => { if (ORIGINAIS[nome]) ORIGINAIS[nome](...args); });
+}
+
+function fimPartidaOnline(indiceVencedor) {
+  const msg = { tipo: "fim", vencedor: indiceVencedor, placar: [lutadores[0].vitorias, lutadores[1].vitorias], nomes: lutadores.map(f => f.p.nome) };
+  enviar(msg);
+  mostrarFimOnline(msg);
+}
+
+function mostrarFimOnline(m) {
+  estadoLuta = "nenhum";
+  pararMusica();
+  const venci = m.vencedor === (rede.host ? 0 : 1);
+  document.getElementById("tituloResultado").innerHTML = venci ? "VOCÊ <span>VENCEU!</span>" : "VOCÊ <span>PERDEU</span>";
+  document.getElementById("textoResultado").textContent = `${m.nomes[0]} ${m.placar[0]} × ${m.placar[1]} ${m.nomes[1]}`;
+  ORIGINAIS.falar(venci ? "You win!" : "You lose", 0.55);
+  botoes("botoesResultado", [
+    ["REVANCHE", "", () => { if (rede.host) comecarRevanche(); else { enviar({ tipo: "revanche" }); document.getElementById("textoResultado").textContent = "Pedido de revanche enviado…"; } }],
+    ["TROCAR LUTADORES", "azul", () => voltarSelecaoOnline(true)],
+    ["SAIR DA SALA", "sec", () => { encerrarRede(); irTitulo(); }]
+  ]);
+  mostrarTela("telaResultado");
+}
+
+function comecarRevanche() {
+  const dados = { tipo: "iniciar", p1: lutadores[0].id, p2: lutadores[1].id, arena: palcoAtual };
+  enviar(dados);
+  iniciarOnline(dados);
+}
+
+function voltarSelecaoOnline(avisar) {
+  if (avisar) enviar({ tipo: "selecao" });
+  estadoLuta = "nenhum"; lutadores = [];
+  pararMusica();
+  rede.euPronto = rede.amigoPronto = false;
+  escolhaP2 = rede.amigo;
+  abrirSelecao("online");
+  atualizarProntos();
+}
+
+document.getElementById("botaoCriarSala").onclick = () => { ctxAudio(); bip(700, 0.05, 0.08); criarSala(); };
+document.getElementById("botaoEntrarSala").onclick = () => { ctxAudio(); bip(700, 0.05, 0.08); entrarSala(); };
+document.getElementById("campoCodigo").addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") entrarSala(); });
+document.getElementById("botaoCancelarSala").onclick = () => abrirOnline();
+document.getElementById("botaoCopiar").onclick = () => {
+  const codigo = document.getElementById("codigoSala").textContent;
+  navigator.clipboard.writeText(codigo).then(() => { document.getElementById("botaoCopiar").textContent = "✔ COPIADO!"; setTimeout(() => document.getElementById("botaoCopiar").textContent = "📋 COPIAR CÓDIGO", 1500); }).catch(() => {});
+};
+
 // ===== Laço principal =====
 let ultimo = performance.now(), tempoTotal = 0, mediaQuadro = 1 / 60;
 function laco(agora) {
@@ -1756,7 +2071,13 @@ function laco(agora) {
   if (!modoLeve && tempoTotal > 3 && mediaQuadro > 1 / 45) modoLeve = true;
 
   if (lutadores.length && estadoLuta !== "nenhum") {
-    atualizarLuta(dt);
+    if (modo === "online" && !rede.host) {
+      atualizarVisuais(dt);
+      enviarControles();
+    } else {
+      atualizarLuta(dt);
+      if (modo === "online") enviarEstado();
+    }
     if (anuncio.vida > 0 && estadoLuta !== "pausado") anuncio.vida -= dt;
     desenharLuta(tempoTotal);
   } else {
