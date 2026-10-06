@@ -74,6 +74,25 @@
   #caixaVel .rotulo { font-size: 0.7rem; color: var(--suave); text-align: left; margin-top: 4px; }
   #mensagem { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); font-family: var(--titulo); font-size: clamp(2rem, 8vw, 5rem); color: var(--amarelo); text-shadow: 0 0 20px var(--amarelo), 4px 4px 0 #2a0a4a; white-space: nowrap; }
   #alerta { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); font-family: var(--titulo); font-size: 1rem; color: var(--rosa); text-shadow: 0 0 10px var(--rosa); }
+  /* ===== Online ===== */
+  input { user-select: text; }
+  .painel-online { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .campo { display: flex; flex-direction: column; gap: 6px; font-size: 0.75rem; letter-spacing: 3px; color: var(--suave); }
+  .campo input, #campoCodigo { font-family: inherit; font-weight: 900; font-size: 1.1rem; text-align: center; padding: 10px 14px; border-radius: 10px;
+    border: 2px solid var(--borda); background: rgba(0, 0, 0, 0.45); color: var(--amarelo); width: 230px; }
+  #campoCodigo { width: 150px; letter-spacing: 5px; text-transform: uppercase; }
+  .campo input:focus, #campoCodigo:focus { outline: none; border-color: var(--amarelo); }
+  .linha-entrar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  #codigoSala { font-family: var(--titulo); font-size: 2.2rem; color: var(--amarelo); letter-spacing: 8px; text-shadow: 0 0 16px var(--amarelo); }
+  .botao.mini { font-size: 0.7rem; padding: 10px 18px; }
+  .botao.online { background: linear-gradient(90deg, var(--ciano), #b06bff); color: #0b0820; box-shadow: 0 0 24px rgba(0, 240, 255, 0.5), 0 5px 0 #3a2a7a; }
+  .botao:disabled { opacity: 0.45; cursor: default; transform: none; }
+  .bolinha { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 8px; vertical-align: -2px; }
+  .tabela .vazio { color: var(--suave); font-style: italic; }
+  .info-sala { color: var(--suave); font-size: 0.85rem; }
+  .info-sala b { color: var(--amarelo); }
+  .erro { color: #ff6a8a; font-weight: 700; min-height: 1.2em; }
+  .opcao.usada { opacity: 0.25; cursor: not-allowed; }
   #dicaHud { position: absolute; left: 16px; bottom: 16px; font-size: 0.75rem; color: var(--suave); background: var(--painel); border-radius: 8px; padding: 6px 10px; }
 </style>
 </head>
@@ -83,7 +102,7 @@
 <div class="tela" id="menu">
   <a href="index.html" class="voltar">← Voltar ao Fliperama</a>
   <div class="logo">TURBO <span>NEON</span></div>
-  <div class="sub">CORRIDA RETRÔ · 3 VOLTAS · 4 CARROS</div>
+  <div class="sub">CORRIDA RETRÔ · 3 VOLTAS · 6 PISTAS</div>
   <div class="aviso-pc" id="avisoPc">⚠️ Este jogo é só para PC: precisa de teclado.</div>
 
   <div class="secao">
@@ -105,11 +124,58 @@
     </div>
   </div>
 
-  <button class="botao" id="botaoCorrer">CORRER!</button>
+  <div class="linha-botoes">
+    <button class="botao" id="botaoCorrer">CORRER!</button>
+    <button class="botao online" id="botaoOnline">🌐 ONLINE (ATÉ 4)</button>
+  </div>
   <div class="controles">
     <b>W</b> / <b>↑</b> acelerar &nbsp; <b>S</b> / <b>↓</b> frear e ré &nbsp; <b>A D</b> / <b>← →</b> virar<br>
     <b>Shift</b> nitro &nbsp; <b>Espaço</b> freio de mão (drift) &nbsp; <b>C</b> trocar câmera &nbsp; <b>R</b> voltar para a pista &nbsp; <b>P</b> pausar
   </div>
+</div>
+
+<!-- ===== Corrida online ===== -->
+<div class="tela escondida" id="online">
+  <div class="logo">TURBO <span>ONLINE</span></div>
+  <div class="sub">ATÉ 4 PILOTOS NA MESMA SALA</div>
+
+  <div class="painel-online" id="onlineInicio">
+    <label class="campo">SEU NOME<input id="campoNome" maxlength="12" autocomplete="off"></label>
+    <button class="botao" id="botaoCriarSala">CRIAR SALA</button>
+    <div class="sub">OU ENTRE NA SALA DE UM AMIGO</div>
+    <div class="linha-entrar">
+      <input id="campoCodigo" maxlength="5" placeholder="CÓDIGO" autocomplete="off" aria-label="Código da sala">
+      <button class="botao sec" id="botaoEntrarSala">ENTRAR</button>
+    </div>
+  </div>
+
+  <div class="painel-online" id="onlineSala" style="display:none">
+    <div class="sub">CÓDIGO DA SALA</div>
+    <div id="codigoSala"></div>
+    <button class="botao sec mini" id="botaoCopiar">📋 COPIAR CÓDIGO</button>
+    <div class="sub" id="statusSala"></div>
+    <div class="tabela" id="listaPilotos"></div>
+    <div class="info-sala" id="infoSala"></div>
+    <div class="secao">
+      <h2>SUA COR</h2>
+      <div class="opcoes" id="coresOnline"></div>
+    </div>
+    <div class="painel-online" id="opcoesAnfitriao">
+      <div class="secao">
+        <h2>PISTA</h2>
+        <div class="opcoes" id="pistasOnline"></div>
+      </div>
+      <div class="secao">
+        <h2>VAGAS VAZIAS</h2>
+        <div class="opcoes" id="botsOnline"></div>
+      </div>
+      <button class="botao" id="botaoComecar">COMEÇAR CORRIDA!</button>
+    </div>
+    <div class="sub" id="esperaAnfitriao">ESPERANDO O DONO DA SALA COMEÇAR A CORRIDA…</div>
+  </div>
+
+  <div class="erro" id="erroOnline"></div>
+  <button class="botao sec" id="botaoSairOnline">← VOLTAR</button>
 </div>
 
 <!-- ===== Pausa ===== -->
@@ -201,6 +267,33 @@ const PISTAS = {
     ceu: { cores: ["#000006", "#05031a", "#0e0838", "#1a0f50"], astro: "planeta", corAstro: ["#b06bff", "#ff2bd6"], estrelas: 260 },
     nevoa: 0x0a0624, chao: ["#03020c", "rgba(176,107,255,0.3)"], bordas: [0x39ff88, 0xb06bff],
     asfalto: "#0e0b22", faixa: "#39ff88", luz: [0xb8a8ff, 0x100a30], cenario: "espaco"
+  },
+  // Traçado em 8: na volta de cima a pista sobe num viaduto e passa por cima do cruzamento
+  baia: {
+    nome: "Baía do Viaduto", descricao: "Um 8 com ponte sobre o cruzamento",
+    miniatura: "linear-gradient(#0a3a6a 0 35%, #ff4fa0 35% 50%, #04304a 50%)",
+    pontos: Array.from({ length: 24 }, (_, k) => {
+      const t = 0.35 + k / 24 * Math.PI * 2;
+      return [280 * Math.sin(t), 170 * Math.sin(2 * t), 14 * Math.pow((1 - Math.cos(t)) / 2, 3)];
+    }),
+    ceu: { cores: ["#05102a", "#0a3a6a", "#ff4fa0", "#ffb36b"], astro: "sol", corAstro: ["#ffe600", "#ff4fa0"], listras: "#ff4fa0", estrelas: 70 },
+    nevoa: 0x1a3a6a, chao: ["#03263a", "rgba(0,240,255,0.45)"], bordas: [0x39ff88, 0xffe600],
+    asfalto: "#161a33", faixa: "#00f0ff", luz: [0xb0e0ff, 0x10304a], cenario: "baia",
+    suporte: "pilares", corSuporte: 0x2a3a5a
+  },
+  // Sobe e desce em volta de um vulcão: a estrada fica em cima de um aterro de pedra
+  vulcao: {
+    nome: "Vulcão", descricao: "Subidas e descidas em volta da lava",
+    miniatura: "radial-gradient(ellipse at 50% 100%, #ff5a1a 0 22%, transparent 23%), linear-gradient(#050000, #6a120a 55%, #2a0505 55%)",
+    pontos: Array.from({ length: 22 }, (_, k) => {
+      const t = k / 22 * Math.PI * 2;
+      const r = 235 + 70 * Math.sin(2 * t) + 25 * Math.cos(5 * t);
+      return [Math.cos(t) * r, Math.sin(t) * r, Math.max(0.5, 22 + 20 * Math.sin(t - Math.PI / 2) + 7 * Math.sin(3 * t))];
+    }),
+    ceu: { cores: ["#050000", "#2a0505", "#6a120a", "#c0401a"], astro: "lua", corAstro: ["#ff6a3a", "#a02010"], estrelas: 40 },
+    nevoa: 0x3a0c08, chao: ["#140606", "rgba(255,90,30,0.4)"], bordas: [0xff5a1a, 0xffe600],
+    asfalto: "#1c1414", faixa: "#ff7a3d", luz: [0xffb090, 0x401010], cenario: "vulcao",
+    suporte: "muro", corSuporte: 0x2a1616
   }
 };
 
@@ -328,7 +421,7 @@ function criarCeu(ceu) {
 
 // ===== Construção da pista escolhida =====
 let pistaAtual = null, grupoPista = null;
-let amostras = [], tangentes = [], normais = [], passo = 1, centro = new THREE.Vector3(), raioPista = 300;
+let amostras = [], tangentes = [], normais = [], inclinacoes = [], passo = 1, centro = new THREE.Vector3(), raioPista = 300;
 let minX, maxX, minZ, maxZ, escalaMini = 1;
 
 function construirPista(def) {
@@ -342,11 +435,17 @@ function construirPista(def) {
   cena.add(grupoPista);
 
   // traçado
-  const curva = new THREE.CatmullRomCurve3(def.pontos.map(([x, z]) => new THREE.Vector3(x, 0, z)), true, "catmullrom", 0.5);
+  // o terceiro número de cada ponto (se tiver) é a altura da pista
+  const curva = new THREE.CatmullRomCurve3(def.pontos.map(([x, z, y = 0]) => new THREE.Vector3(x, y, z)), true, "catmullrom", 0.5);
   amostras = curva.getSpacedPoints(N).slice(0, N);
   passo = curva.getLength() / N;
-  tangentes = amostras.map((p, i) => amostras[(i + 1) % N].clone().sub(amostras[(i - 1 + N) % N]).normalize());
+  tangentes = amostras.map((p, i) => {
+    const t = amostras[(i + 1) % N].clone().sub(amostras[(i - 1 + N) % N]);
+    t.y = 0; // a direção é medida vista de cima
+    return t.normalize();
+  });
   normais = tangentes.map(t => new THREE.Vector3(t.z, 0, -t.x));
+  inclinacoes = amostras.map((p, i) => (amostras[(i + 1) % N].y - amostras[(i - 1 + N) % N].y) / (2 * passo));
   minX = Infinity; maxX = -Infinity; minZ = Infinity; maxZ = -Infinity;
   amostras.forEach(p => { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); });
   centro.set((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
@@ -396,9 +495,33 @@ function construirPista(def) {
     [-1, 1].forEach((lado, k) => {
       const p = amostras[i].clone().addScaledVector(normais[i], lado * (LARGURA / 2 + 2));
       const poste = new THREE.Mesh(geoPoste, matPostes[k]);
-      poste.position.set(p.x, 1.1, p.z);
+      poste.position.set(p.x, p.y + 1.1, p.z);
       grupoPista.add(poste);
     });
+  }
+
+  // pista elevada: pilares embaixo (viaduto) ou aterro de pedra dos lados
+  if (def.suporte === "pilares") {
+    const geoPilar = new THREE.BoxGeometry(1.6, 1, 1.6);
+    const matPilar = new THREE.MeshLambertMaterial({ color: def.corSuporte });
+    for (let i = 0; i < N; i += 7) {
+      const p = amostras[i];
+      if (p.y < 2.5) continue;
+      [-1, 1].forEach(l => {
+        const q = p.clone().addScaledVector(normais[i], l * (LARGURA / 2 - 1));
+        if (cimaDeOutroTrecho(q, i)) return; // não põe pilar no meio da pista de baixo
+        const pilar = adicionar(geoPilar, matPilar, q.x, p.y / 2, q.z);
+        pilar.scale.y = p.y;
+      });
+    }
+    // grade de proteção neon que aparece só na parte alta
+    const subir = p => p.y + 1.1 * Math.max(0, Math.min(1, (p.y - 1) / 2));
+    def.bordas.forEach((cor, k) => criarParede((k ? 1 : -1) * (LARGURA / 2 + 0.7), new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0.45, side: THREE.DoubleSide }), p => p.y, subir));
+    // laje do viaduto vista de baixo
+    criarFaixa(-LARGURA / 2 - 0.7, LARGURA / 2 + 0.7, -0.6, new THREE.MeshLambertMaterial({ color: def.corSuporte, side: THREE.DoubleSide }));
+  } else if (def.suporte === "muro") {
+    const matMuro = new THREE.MeshLambertMaterial({ color: def.corSuporte, side: THREE.DoubleSide });
+    [-1, 1].forEach(l => criarParede(l * (LARGURA / 2 + 0.7), matMuro, () => 0, p => p.y + 0.04));
   }
 
   // largada: faixa quadriculada + pórtico
@@ -406,7 +529,7 @@ function construirPista(def) {
     for (let x = 0; x < 8; x++) for (let y = 0; y < 2; y++) { c.fillStyle = (x + y) % 2 ? "#ffffff" : "#111111"; c.fillRect(x * 8, y * 8, 8, 8); }
   });
   const largada = new THREE.Group();
-  largada.position.set(amostras[0].x, 0.06, amostras[0].z);
+  largada.position.set(amostras[0].x, amostras[0].y + 0.06, amostras[0].z);
   largada.rotation.y = Math.atan2(tangentes[0].x, tangentes[0].z);
   const linha = new THREE.Mesh(new THREE.PlaneGeometry(LARGURA, 2), new THREE.MeshBasicMaterial({ map: texXadrez }));
   linha.rotation.x = -Math.PI / 2;
@@ -430,7 +553,7 @@ function criarFaixa(desde, ate, y, material, repeticaoUV = 40) {
   const pos = [], uv = [], idx = [];
   for (let i = 0; i <= N; i++) {
     const p = amostras[i % N], n = normais[i % N];
-    pos.push(p.x + n.x * desde, y, p.z + n.z * desde, p.x + n.x * ate, y, p.z + n.z * ate);
+    pos.push(p.x + n.x * desde, p.y + y, p.z + n.z * desde, p.x + n.x * ate, p.y + y, p.z + n.z * ate);
     const v = (i * passo) / repeticaoUV;
     uv.push(0, v, 1, v);
     if (i < N) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
@@ -438,6 +561,33 @@ function criarFaixa(desde, ate, y, material, repeticaoUV = 40) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, material);
+  grupoPista.add(m);
+  return m;
+}
+
+// Ponto que fica em cima de outro pedaço da pista (no cruzamento do 8)
+function cimaDeOutroTrecho(q, i) {
+  for (let j = 0; j < N; j += 3) {
+    const longe = Math.min(Math.abs(i - j), N - Math.abs(i - j)) > 80;
+    if (longe && (amostras[j].x - q.x) ** 2 + (amostras[j].z - q.z) ** 2 < (LARGURA / 2 + 3) ** 2) return true;
+  }
+  return false;
+}
+
+// Parede vertical ao longo da pista (aterro ou grade), da altura base(p) até topo(p)
+function criarParede(desloc, material, base, topo) {
+  const pos = [], idx = [];
+  for (let i = 0; i <= N; i++) {
+    const p = amostras[i % N], n = normais[i % N];
+    const x = p.x + n.x * desloc, z = p.z + n.z * desloc;
+    pos.push(x, base(p), z, x, topo(p), z);
+    if (i < N) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setIndex(idx);
   geo.computeVertexNormals();
   const m = new THREE.Mesh(geo, material);
@@ -558,12 +708,108 @@ const CENARIOS = {
       anel.rotation.y = Math.atan2(tangentes[i].x, tangentes[i].z); // arco atravessando a pista
     }
     montanhas(0x0c0828, 0x39ff88, 16);
+  },
+
+  // Baía: coqueiros na beira, ilhas, um farol e a cidade no horizonte
+  baia() {
+    const matTronco = new THREE.MeshLambertMaterial({ color: 0x6a4a3a });
+    const matFolha = new THREE.MeshLambertMaterial({ color: 0x1fae6a });
+    const geoTronco = new THREE.CylinderGeometry(0.3, 0.45, 1, 6);
+    const geoFolha = new THREE.ConeGeometry(2.6, 0.6, 7);
+    for (let i = 0; i < N; i += 9) {
+      if (amostras[i].y > 3) continue; // não planta coqueiro embaixo do viaduto
+      [-1, 1].forEach(lado => {
+        if (Math.random() < 0.35) return;
+        const p = amostras[i].clone().addScaledVector(normais[i], lado * (LARGURA / 2 + 4 + Math.random() * 12));
+        if (!longeDaPista(p.x, p.z, LARGURA / 2 + 3)) return;
+        const h = 6 + Math.random() * 5;
+        const tronco = adicionar(geoTronco, matTronco, p.x, h / 2, p.z);
+        tronco.scale.y = h;
+        tronco.rotation.z = (Math.random() - 0.5) * 0.25;
+        adicionar(geoFolha, matFolha, p.x, h + 0.2, p.z).rotation.y = Math.random() * 3;
+        const folha2 = adicionar(geoFolha, matFolha, p.x, h - 0.3, p.z);
+        folha2.scale.set(0.8, 1.6, 0.8);
+      });
+    }
+    // ilhas e o farol
+    const matIlha = new THREE.MeshLambertMaterial({ color: 0x0f3a2a });
+    const matArameIlha = new THREE.MeshBasicMaterial({ color: 0x39ff88, wireframe: true, transparent: true, opacity: 0.35 });
+    for (let k = 0; k < 14; k++) {
+      const ang = Math.random() * Math.PI * 2, dist = raioPista + 120 + Math.random() * 180;
+      const r = 25 + Math.random() * 40, h = 15 + Math.random() * 35;
+      const geo = new THREE.ConeGeometry(r, h, 6);
+      [matIlha, matArameIlha].forEach(mat => adicionar(geo, mat, centro.x + Math.cos(ang) * dist, h / 2 - 1, centro.z + Math.sin(ang) * dist));
+    }
+    const fx = centro.x + raioPista * 0.15, fz = centro.z + 60;
+    if (longeDaPista(fx, fz, 20)) {
+      adicionar(new THREE.CylinderGeometry(2.2, 3.2, 26, 10), new THREE.MeshLambertMaterial({ color: 0xf2f0ff }), fx, 13, fz);
+      adicionar(new THREE.CylinderGeometry(2.4, 2.4, 3, 10), new THREE.MeshBasicMaterial({ color: 0xff2a4a }), fx, 20, fz);
+      adicionar(new THREE.SphereGeometry(2.2, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe600 }), fx, 28, fz);
+    }
+    // prédios da cidade lá longe
+    const matPredio = new THREE.MeshBasicMaterial({ color: 0x0a1a3a });
+    const matJanela = new THREE.MeshBasicMaterial({ color: 0x00f0ff, wireframe: true, transparent: true, opacity: 0.3 });
+    for (let k = 0; k < 40; k++) {
+      const ang = Math.PI * 0.9 + (k / 40) * Math.PI * 0.6, dist = raioPista + 380 + Math.random() * 60;
+      const w = 18 + Math.random() * 22, h = 30 + Math.random() * 110;
+      const geo = new THREE.BoxGeometry(w, h, w);
+      [matPredio, matJanela].forEach(mat => adicionar(geo, mat, centro.x + Math.cos(ang) * dist, h / 2, centro.z + Math.sin(ang) * dist));
+    }
+  },
+
+  // Vulcão no meio, lagos de lava, pedras e brasas no céu
+  vulcao() {
+    const matRocha = new THREE.MeshLambertMaterial({ color: 0x2a1a1a, flatShading: true });
+    const matLava = new THREE.MeshBasicMaterial({ color: 0xff5a1a });
+    const matArame = new THREE.MeshBasicMaterial({ color: 0xff5a1a, wireframe: true, transparent: true, opacity: 0.3 });
+    const geoVulcao = new THREE.CylinderGeometry(22, 100, 120, 14, 4);
+    adicionar(geoVulcao, matRocha, centro.x, 60, centro.z);
+    adicionar(geoVulcao, matArame, centro.x, 60, centro.z).scale.setScalar(1.01);
+    const cratera = adicionar(new THREE.CircleGeometry(20, 16), matLava, centro.x, 120.2, centro.z);
+    cratera.rotation.x = -Math.PI / 2;
+    // rios de lava descendo o vulcão
+    for (let k = 0; k < 6; k++) {
+      const ang = k / 6 * Math.PI * 2 + 0.3;
+      const rio = adicionar(new THREE.BoxGeometry(4, 0.6, 143), matLava, centro.x + Math.cos(ang) * 62, 60, centro.z + Math.sin(ang) * 62);
+      rio.rotation.order = "YXZ";
+      rio.rotation.y = Math.PI / 2 - ang; // aponta para fora do vulcão
+      rio.rotation.x = 0.99;              // e desce junto com a encosta
+    }
+    // lagos de lava no chão
+    let lagos = 0, tentativas = 0;
+    while (lagos < 18 && tentativas < 300) {
+      tentativas++;
+      const ang = Math.random() * Math.PI * 2, dist = 110 + Math.random() * (raioPista + 200);
+      const x = centro.x + Math.cos(ang) * dist, z = centro.z + Math.sin(ang) * dist;
+      const r = 6 + Math.random() * 16;
+      if (!longeDaPista(x, z, LARGURA / 2 + r + 8)) continue;
+      const lago = adicionar(new THREE.CircleGeometry(r, 14), matLava, x, 0.1, z);
+      lago.rotation.x = -Math.PI / 2;
+      lagos++;
+    }
+    // pedras
+    for (let k = 0; k < 50; k++) {
+      const ang = Math.random() * Math.PI * 2, dist = 110 + Math.random() * (raioPista + 260);
+      const x = centro.x + Math.cos(ang) * dist, z = centro.z + Math.sin(ang) * dist;
+      const r = 2 + Math.random() * 7;
+      if (!longeDaPista(x, z, LARGURA / 2 + r + 4)) continue;
+      const pedra = adicionar(new THREE.DodecahedronGeometry(r, 0), matRocha, x, r * 0.5, z);
+      pedra.rotation.set(Math.random() * 3, Math.random() * 3, 0);
+    }
+    // brasas flutuando
+    const brasas = new THREE.BufferGeometry();
+    const pts = [];
+    for (let k = 0; k < 500; k++) pts.push(centro.x + (Math.random() - 0.5) * (raioPista * 2 + 300), Math.random() * 160, centro.z + (Math.random() - 0.5) * (raioPista * 2 + 300));
+    brasas.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+    grupoPista.add(new THREE.Points(brasas, new THREE.PointsMaterial({ color: 0xff8a3a, size: 1.4, transparent: true, opacity: 0.8 })));
+    montanhas(0x1a0505, 0xff5a1a, 20);
   }
 };
 
 // ===== Carros =====
 function criarCarro(cor) {
   const g = new THREE.Group();
+  g.rotation.order = "YXZ"; // vira e depois inclina na subida
   const corpo = new THREE.MeshLambertMaterial({ color: cor });
   const escuro = new THREE.MeshLambertMaterial({ color: 0x15102a });
   const vidro = new THREE.MeshLambertMaterial({ color: 0x2a3a6a });
@@ -603,7 +849,8 @@ function novoCarro(cor, nome, ehJogador, inicioIdx, lado) {
     nome, ehJogador, modelo: criarCarro(cor), cor,
     pos: p, ang: Math.atan2(t.x, t.z), vel: 0, giro: 0,
     idx: inicioIdx, voltas: 0, passouMeio: false, terminou: false, tempoFinal: 0,
-    nitro: 1, usandoNitro: false, faixa: lado, alvoFaixa: lado, vmax: 0
+    nitro: 1, usandoNitro: false, faixa: lado, alvoFaixa: lado, vmax: 0,
+    y: amostras[inicioIdx].y, id: null, remoto: false, bot: false
   };
 }
 
@@ -612,22 +859,36 @@ let estado = "menu"; // menu | contagem | correndo | pausado | fim
 let tempoCorrida = 0, contagem = 0, inicioVolta = 0, melhorVolta = 0, temposVolta = [];
 let camHood = false, teclas = {}, ultimoNumero = 4;
 
-function iniciarCorrida() {
-  construirPista(PISTAS[pistaEscolhida]);
+const GRID = [[N - 8, -3.5], [N - 8, 3.5], [N - 16, -3.5], [N - 16, 3.5]]; // atrás da linha de largada
+
+function limparCarros() {
   carros.forEach(c => cena.remove(c.modelo));
   carros = [];
+  jogador = null;
+}
+
+function iniciarCorrida() {
+  modo = "solo";
+  construirPista(PISTAS[pistaEscolhida]);
+  limparCarros();
   const dif = DIFICULDADES[difEscolhida];
   const coresIA = CORES.filter((_, i) => i !== corEscolhida).slice(0, 3);
-  const grid = [[N - 8, -3.5], [N - 8, 3.5], [N - 16, -3.5], [N - 16, 3.5]]; // atrás da linha de largada
-  jogador = novoCarro(CORES[corEscolhida].cor, "Você", true, grid[3][0], grid[3][1]);
+  jogador = novoCarro(CORES[corEscolhida].cor, "Você", true, GRID[3][0], GRID[3][1]);
   coresIA.forEach((c, i) => {
-    const carro = novoCarro(c.cor, NOMES_IA[i], false, grid[i][0], grid[i][1]);
+    const carro = novoCarro(c.cor, NOMES_IA[i], false, GRID[i][0], GRID[i][1]);
     carro.vmax = dif.vmax * (0.95 + i * 0.03);
     carro.curva = dif.curva;
     carros.push(carro);
   });
   carros.push(jogador);
-  carros.forEach(c => { c.modelo.position.copy(c.pos); c.modelo.rotation.y = c.ang; });
+  comecarContagem();
+}
+
+function comecarContagem() {
+  carros.forEach(c => { c.modelo.position.set(c.pos.x, c.y, c.pos.z); c.modelo.rotation.y = c.ang; });
+  document.getElementById("botaoDeNovo").textContent = modo === "online" ? "VOLTAR À SALA" : "CORRER DE NOVO";
+  document.getElementById("botaoMenuFim").textContent = modo === "online" ? "SAIR DA SALA" : "MENU";
+  document.getElementById("botaoMenuPausa").textContent = "MENU";
 
   tempoCorrida = 0; melhorVolta = 0; temposVolta = []; inicioVolta = 0;
   contagem = 3.99;
@@ -640,7 +901,7 @@ function iniciarCorrida() {
 }
 
 function mostrarTela(id) {
-  ["menu", "pausa", "fim"].forEach(t => document.getElementById(t).classList.toggle("escondida", t !== id));
+  ["menu", "online", "pausa", "fim"].forEach(t => document.getElementById(t).classList.toggle("escondida", t !== id));
 }
 
 // Acha o ponto da pista mais perto do carro (procura só perto do último)
@@ -758,7 +1019,7 @@ function atualizarIA(c, dt) {
   let alvoVel = c.vmax * (1 - Math.min(c.curva, curvatura * 0.9));
 
   // "elástico": quem está muito atrás acelera um pouco, quem está muito na frente segura
-  const dif = progresso(c) - progresso(jogador);
+  const dif = progresso(c) - progressoReferencia();
   if (dif < -120) alvoVel *= 1.08;
   if (dif > 160) alvoVel *= 0.93;
   if (c.terminou) alvoVel *= 0.6;
@@ -775,20 +1036,23 @@ function moverCarro(c, dt) {
 function colisoes() {
   for (let i = 0; i < carros.length; i++) for (let j = i + 1; j < carros.length; j++) {
     const a = carros[i], b = carros[j];
+    if (a.remoto && b.remoto) continue;              // cada computador cuida do próprio carro
+    if (Math.abs(a.y - b.y) > 2.5) continue;         // um no viaduto e outro embaixo
     const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
     const d = Math.hypot(dx, dz);
     if (d > 0 && d < 2.8) {
-      const empurra = (2.8 - d) / 2;
-      a.pos.x -= dx / d * empurra; a.pos.z -= dz / d * empurra;
-      b.pos.x += dx / d * empurra; b.pos.z += dz / d * empurra;
+      const pa = a.remoto ? 0 : b.remoto ? 1 : 0.5, pb = b.remoto ? 0 : a.remoto ? 1 : 0.5;
+      const empurra = 2.8 - d;
+      a.pos.x -= dx / d * empurra * pa; a.pos.z -= dz / d * empurra * pa;
+      b.pos.x += dx / d * empurra * pb; b.pos.z += dz / d * empurra * pb;
       // só troca velocidade se um estiver indo para cima do outro (não a cada quadro encostado)
       const nx = dx / d, nz = dz / d;
       const aproximando = (Math.sin(a.ang) * a.vel - Math.sin(b.ang) * b.vel) * nx +
                           (Math.cos(a.ang) * a.vel - Math.cos(b.ang) * b.vel) * nz;
       if (aproximando > 0) {
         const va = a.vel, vb = b.vel;
-        a.vel = va * 0.85 + vb * 0.15;
-        b.vel = vb * 0.85 + va * 0.15;
+        if (!a.remoto) a.vel = va * 0.85 + vb * 0.15;
+        if (!b.remoto) b.vel = vb * 0.85 + va * 0.15;
         if ((a.ehJogador || b.ehJogador) && aproximando > 4) bip(140, 0.12, "sawtooth", 0.08);
       }
     }
@@ -801,12 +1065,12 @@ function atualizarCamera(dt) {
   const c = jogador;
   const fx = Math.sin(c.ang), fz = Math.cos(c.ang);
   if (camHood) {
-    camera.position.set(c.pos.x + fx * 0.6, 1.35, c.pos.z + fz * 0.6);
-    olharPara.set(c.pos.x + fx * 20, 1.0, c.pos.z + fz * 20);
+    camera.position.set(c.pos.x + fx * 0.6, c.y + 1.35, c.pos.z + fz * 0.6);
+    olharPara.set(c.pos.x + fx * 20, c.y + 1.0 + inclinacoes[c.idx] * 20, c.pos.z + fz * 20);
   } else {
-    alvoCam.set(c.pos.x - fx * 9, 3.6, c.pos.z - fz * 9);
+    alvoCam.set(c.pos.x - fx * 9, c.y + 3.6, c.pos.z - fz * 9);
     camera.position.lerp(alvoCam, Math.min(1, dt * 6));
-    olharPara.set(c.pos.x + fx * 4, 1.2, c.pos.z + fz * 4);
+    olharPara.set(c.pos.x + fx * 4, c.y + 1.2, c.pos.z + fz * 4);
   }
   camera.lookAt(olharPara);
   const fovAlvo = 68 + Math.min(1, Math.abs(c.vel) / VMAX) * 14 + (c.usandoNitro ? 10 : 0);
@@ -848,6 +1112,11 @@ function atualizarHUD() {
   document.getElementById("barraNitro").style.width = `${jogador.nitro * 100}%`;
 }
 
+function preencherTabela() {
+  document.getElementById("tabelaFim").innerHTML = [...carros].sort((a, b) => progresso(b) - progresso(a)).map((c, i) =>
+    `<div class="${c.ehJogador ? "voce" : ""}"><span>${i + 1}º · ${escapar(c.nome)}</span><span>${c.terminou ? formatar(c.tempoFinal * 1000) : "na pista"}</span></div>`).join("");
+}
+
 function terminarCorrida() {
   const ranking = [...carros].sort((a, b) => progresso(b) - progresso(a));
   const pos = ranking.indexOf(jogador) + 1;
@@ -862,11 +1131,11 @@ function terminarCorrida() {
   }
 
   setTimeout(() => {
+    if (!jogador) return; // saiu antes de mostrar o resultado
     estado = "fim";
     pararSom();
     document.getElementById("tituloFim").textContent = pos === 1 ? "🏆 1º LUGAR!" : `${pos}º LUGAR`;
-    document.getElementById("tabelaFim").innerHTML = [...carros].sort((a, b) => progresso(b) - progresso(a)).map((c, i) =>
-      `<div class="${c.ehJogador ? "voce" : ""}"><span>${i + 1}º · ${c.nome}</span><span>${c.terminou ? formatar(c.tempoFinal * 1000) : "na pista"}</span></div>`).join("");
+    preencherTabela();
     document.getElementById("textoFim").innerHTML =
       `${PISTAS[pistaEscolhida].nome} · Melhor volta: ${formatar(melhorVolta * 1000)}<br>Voltas: ${temposVolta.map(t => formatar(t * 1000)).join(" / ")}<br>${textoRecorde}`;
     mostrarTela("fim");
@@ -919,6 +1188,7 @@ function atualizarSom() {
 
 // ===== Controles =====
 document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") { if (e.key === "Enter" && e.target.id === "campoCodigo") entrarSala(); return; }
   teclas[e.code] = true;
   if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
   if (e.code === "KeyC" && (estado === "correndo" || estado === "contagem")) camHood = !camHood;
@@ -928,29 +1198,479 @@ document.addEventListener("keydown", e => {
     jogador.ang = Math.atan2(t.x, t.z);
     jogador.vel = 0;
   }
-  if (e.code === "KeyP") {
+  if (e.code === "KeyP" && modo !== "online") {
     if (estado === "correndo") { estado = "pausado"; mostrarTela("pausa"); atualizarSom(); }
     else if (estado === "pausado") { estado = "correndo"; mostrarTela(null); }
   }
 });
 document.addEventListener("keyup", e => teclas[e.code] = false);
-addEventListener("blur", () => { teclas = {}; if (estado === "correndo") { estado = "pausado"; mostrarTela("pausa"); } });
+addEventListener("blur", () => { teclas = {}; if (estado === "correndo" && modo !== "online") { estado = "pausado"; mostrarTela("pausa"); } });
 
 document.getElementById("botaoCorrer").addEventListener("click", e => { iniciarCorrida(); e.currentTarget.blur(); });
-document.getElementById("botaoDeNovo").addEventListener("click", e => { iniciarCorrida(); e.currentTarget.blur(); });
+document.getElementById("botaoDeNovo").addEventListener("click", e => {
+  e.currentTarget.blur();
+  if (modo === "online") voltarSala(); else iniciarCorrida();
+});
 document.getElementById("botaoContinuar").addEventListener("click", () => { estado = "correndo"; mostrarTela(null); });
 const irMenu = () => {
+  if (modo === "online" || rede.peer) sairOnline();
   estado = "menu";
   pararSom();
-  carros.forEach(c => cena.remove(c.modelo));
-  carros = [];
-  jogador = null;
+  limparCarros();
   desenharPistas();
+  construirPista(PISTAS[pistaEscolhida]);
   document.getElementById("hud").classList.add("escondido");
   mostrarTela("menu");
 };
 document.getElementById("botaoMenuPausa").addEventListener("click", irMenu);
 document.getElementById("botaoMenuFim").addEventListener("click", irMenu);
+
+// =====================================================================
+//  CORRIDA ONLINE (PeerJS) — até 4 pilotos por sala
+//  Quem cria a sala é o anfitrião: os amigos se conectam nele.
+//  Cada computador dirige o próprio carro e manda a posição ~20 vezes por segundo;
+//  o anfitrião junta tudo (e dirige os bots) e repassa para todo mundo.
+// =====================================================================
+const PREFIXO_SALA = "fliperama-turbo-neon-";
+const MAX_PILOTOS = 4;
+const NOMES_DIF = { facil: "Fácil", normal: "Normal", dificil: "Difícil" };
+let modo = "solo"; // solo | online
+const rede = {
+  peer: null, host: false, conexoes: new Map(), conexao: null, meuId: null,
+  jogadores: [], pista: "sunset", bots: "normal", emCorrida: false, tempoEnvio: 0, tempoTabela: 0, proximoId: 1
+};
+let nomePiloto = "";
+try { nomePiloto = localStorage.getItem("fliperama_turbo_nome") || ""; } catch (e) {}
+if (!nomePiloto) nomePiloto = "Piloto " + (10 + Math.floor(Math.random() * 90));
+
+const escapar = t => String(t).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+const hexCor = i => "#" + CORES[i].cor.toString(16).padStart(6, "0");
+
+function progressoReferencia() {
+  if (modo !== "online") return progresso(jogador);
+  const humanos = carros.filter(c => !c.bot);
+  return humanos.length ? Math.max(...humanos.map(progresso)) : progresso(jogador);
+}
+
+function carregarPeerJS() {
+  if (window.Peer) return Promise.resolve();
+  return new Promise((ok, falha) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js";
+    sc.onload = ok;
+    sc.onerror = () => falha(new Error("Não deu para carregar o modo online. Confira a internet."));
+    document.head.appendChild(sc);
+  });
+}
+
+function gerarCodigo() {
+  const letras = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sem O/0 e I/1, que se confundem
+  return Array.from({ length: 5 }, () => letras[Math.floor(Math.random() * letras.length)]).join("");
+}
+
+function mostrarParteOnline(parte) {
+  document.getElementById("onlineInicio").style.display = parte === "inicio" ? "flex" : "none";
+  document.getElementById("onlineSala").style.display = parte === "sala" ? "flex" : "none";
+}
+
+function erroOnline(msg) {
+  sairOnline();
+  document.getElementById("erroOnline").textContent = msg;
+  mostrarParteOnline("inicio");
+}
+
+function abrirOnline() {
+  ctxAudio();
+  document.getElementById("campoNome").value = nomePiloto;
+  document.getElementById("erroOnline").textContent = "";
+  mostrarParteOnline(rede.peer ? "sala" : "inicio");
+  mostrarTela("online");
+}
+
+function lerNome() {
+  nomePiloto = (document.getElementById("campoNome").value.trim() || nomePiloto).slice(0, 12);
+  try { localStorage.setItem("fliperama_turbo_nome", nomePiloto); } catch (e) {}
+  return nomePiloto;
+}
+
+function status(texto) { document.getElementById("statusSala").textContent = texto; }
+
+// ----- Anfitrião -----
+async function criarSala(tentativa = 0) {
+  lerNome();
+  document.getElementById("erroOnline").textContent = "";
+  try { await carregarPeerJS(); } catch (e) { return erroOnline(e.message); }
+  const codigo = gerarCodigo();
+  rede.host = true;
+  rede.meuId = "h";
+  rede.pista = pistaEscolhida;
+  rede.jogadores = [{ id: "h", nome: nomePiloto, cor: corEscolhida }];
+  rede.peer = new Peer(PREFIXO_SALA + codigo);
+  document.getElementById("codigoSala").textContent = codigo;
+  mostrarParteOnline("sala");
+  status("ABRINDO A SALA…");
+  desenharSala();
+  rede.peer.on("open", () => status("SALA ABERTA! MANDE O CÓDIGO PARA ATÉ 3 AMIGOS"));
+  rede.peer.on("connection", receberConexao);
+  rede.peer.on("error", err => {
+    if (err.type === "unavailable-id" && tentativa < 3) { sairOnline(); return criarSala(tentativa + 1); }
+    if (err.type === "peer-unavailable") return; // um amigo que já saiu
+    erroOnline("Erro na conexão: " + (err.type || err.message));
+  });
+}
+
+function receberConexao(conn) {
+  conn.on("open", () => {
+    if (rede.jogadores.length >= MAX_PILOTOS || rede.emCorrida) {
+      conn.send({ t: "recusado", motivo: rede.emCorrida ? "A corrida já começou. Espere acabar e tente de novo." : "A sala está cheia (4 pilotos)." });
+      setTimeout(() => conn.close(), 600);
+      return;
+    }
+    conn.idPiloto = "j" + rede.proximoId++;
+    rede.conexoes.set(conn.idPiloto, conn);
+  });
+  conn.on("data", m => receberNoAnfitriao(conn, m));
+  conn.on("close", () => pilotoSaiu(conn.idPiloto));
+  conn.on("error", () => pilotoSaiu(conn.idPiloto));
+}
+
+function corLivre(preferida, quem) {
+  const usada = i => rede.jogadores.some(j => j !== quem && j.cor === i);
+  if (preferida >= 0 && preferida < CORES.length && !usada(preferida)) return preferida;
+  return CORES.findIndex((_, i) => !usada(i));
+}
+
+function receberNoAnfitriao(conn, m) {
+  const id = conn.idPiloto;
+  if (!m || !id || !rede.conexoes.has(id)) return;
+  if (m.t === "ola") {
+    if (rede.jogadores.some(j => j.id === id)) return;
+    const novo = { id, nome: String(m.nome || "Piloto").slice(0, 12), cor: 0 };
+    rede.jogadores.push(novo);
+    novo.cor = corLivre(Number(m.cor), novo);
+    bip(880, 0.1); bip(1320, 0.15, "square", 0.05, 0.1);
+    enviarSala();
+  } else if (m.t === "cor") {
+    const j = rede.jogadores.find(x => x.id === id);
+    if (j && corLivre(Number(m.cor), j) === Number(m.cor)) { j.cor = Number(m.cor); enviarSala(); }
+  } else if (m.t === "eu" && rede.emCorrida) {
+    const c = carros.find(x => x.id === id);
+    if (c && Array.isArray(m.s)) aplicarEstado(c, m.s);
+  }
+}
+
+function enviarSala() {
+  for (const [id, conn] of rede.conexoes) {
+    if (conn.open) conn.send({ t: "sala", voce: id, jogadores: rede.jogadores, pista: rede.pista, bots: rede.bots, emCorrida: rede.emCorrida });
+  }
+  desenharSala();
+}
+
+function paraTodos(msg) { for (const conn of rede.conexoes.values()) if (conn.open) conn.send(msg); }
+
+function pilotoSaiu(id) {
+  if (!id || !rede.conexoes.has(id)) return;
+  rede.conexoes.delete(id);
+  const j = rede.jogadores.find(x => x.id === id);
+  rede.jogadores = rede.jogadores.filter(x => x.id !== id);
+  paraTodos({ t: "saiu", id, nome: j ? j.nome : "" });
+  removerCarro(id, j && j.nome);
+  enviarSala();
+}
+
+function removerCarro(id, nome) {
+  const c = carros.find(x => x.id === id);
+  if (!c) return;
+  cena.remove(c.modelo);
+  carros = carros.filter(x => x !== c);
+  if (nome && (estado === "correndo" || estado === "contagem")) {
+    document.getElementById("alerta").textContent = `${nome} saiu da corrida`;
+    setTimeout(() => { if (document.getElementById("alerta").textContent.includes("saiu")) document.getElementById("alerta").textContent = ""; }, 2500);
+  }
+}
+
+function comecarCorridaOnline() {
+  if (!rede.host) return;
+  const lista = rede.jogadores.map(j => ({ id: j.id, nome: j.nome, cor: j.cor, bot: false }));
+  if (rede.bots) {
+    for (let k = 0; lista.length < MAX_PILOTOS; k++) {
+      const cor = CORES.findIndex((_, i) => !lista.some(j => j.cor === i));
+      lista.push({ id: "b" + k, nome: NOMES_IA[k] + " 🤖", cor, bot: true });
+    }
+  }
+  if (lista.length < 2) return;
+  lista.sort(() => Math.random() - 0.5); // sorteia a posição no grid de largada
+  const msg = { t: "inicio", pista: rede.pista, lista, dif: rede.bots || "normal" };
+  rede.emCorrida = true;
+  paraTodos(msg);
+  iniciarCorridaOnline(msg);
+}
+
+// ----- Convidado -----
+async function entrarSala() {
+  lerNome();
+  const codigo = document.getElementById("campoCodigo").value.trim().toUpperCase();
+  if (codigo.length !== 5) { document.getElementById("erroOnline").textContent = "Digite o código de 5 letras que seu amigo te mandou."; return; }
+  document.getElementById("erroOnline").textContent = "";
+  try { await carregarPeerJS(); } catch (e) { return erroOnline(e.message); }
+  rede.host = false;
+  rede.jogadores = [];
+  rede.peer = new Peer();
+  document.getElementById("codigoSala").textContent = codigo;
+  mostrarParteOnline("sala");
+  status("PROCURANDO A SALA…");
+  desenharSala();
+  const desistir = setTimeout(() => {
+    if (!rede.conexao || !rede.conexao.open) erroOnline("Não achei essa sala. Confira o código ou peça para seu amigo criar outra.");
+  }, 15000);
+  rede.peer.on("open", () => {
+    const conn = rede.peer.connect(PREFIXO_SALA + codigo, { reliable: true });
+    rede.conexao = conn;
+    conn.on("open", () => {
+      clearTimeout(desistir);
+      conn.send({ t: "ola", nome: nomePiloto, cor: corEscolhida });
+      status("VOCÊ ENTROU NA SALA!");
+    });
+    conn.on("data", receberNoConvidado);
+    conn.on("close", anfitriaoSaiu);
+    conn.on("error", anfitriaoSaiu);
+  });
+  rede.peer.on("error", err => {
+    clearTimeout(desistir);
+    erroOnline(err.type === "peer-unavailable" ? "Não achei essa sala. Confira o código." : "Erro na conexão: " + (err.type || err.message));
+  });
+}
+
+function receberNoConvidado(m) {
+  if (!m) return;
+  if (m.t === "recusado") return erroOnline(m.motivo);
+  if (m.t === "sala") {
+    rede.meuId = m.voce;
+    rede.jogadores = m.jogadores;
+    rede.bots = m.bots;
+    rede.emCorrida = m.emCorrida;
+    rede.pista = m.pista;
+    if (estado === "menu") construirPista(PISTAS[m.pista]); // mostra a pista girando atrás da sala
+    desenharSala();
+  } else if (m.t === "inicio") {
+    iniciarCorridaOnline(m);
+  } else if (m.t === "estado") {
+    for (const [id, st] of Object.entries(m.c)) {
+      if (id === rede.meuId) continue;
+      const c = carros.find(x => x.id === id);
+      if (c) aplicarEstado(c, st);
+    }
+  } else if (m.t === "saiu") {
+    removerCarro(m.id, m.nome);
+  } else if (m.t === "fimCorrida") {
+    if (modo === "online" && estado !== "menu") voltarSala();
+  }
+}
+
+function anfitriaoSaiu() {
+  if (!rede.peer) return; // já saiu
+  const corria = modo === "online" && estado !== "menu";
+  sairOnline();
+  if (corria) {
+    estado = "menu";
+    pararSom();
+    limparCarros();
+    document.getElementById("hud").classList.add("escondido");
+  }
+  abrirOnline();
+  document.getElementById("erroOnline").textContent = "O dono da sala saiu ou a internet caiu.";
+}
+
+function enviar(msg) { if (rede.conexao && rede.conexao.open) rede.conexao.send(msg); }
+
+function sairOnline() {
+  const peer = rede.peer, conn = rede.conexao, conexoes = [...rede.conexoes.values()];
+  rede.peer = null; rede.conexao = null; rede.conexoes.clear();
+  rede.host = false; rede.jogadores = []; rede.emCorrida = false; rede.meuId = null;
+  modo = "solo";
+  conexoes.forEach(c => { try { c.close(); } catch (e) {} });
+  if (conn) { try { conn.close(); } catch (e) {} }
+  if (peer) { try { peer.destroy(); } catch (e) {} }
+}
+
+// ----- Tela da sala -----
+function desenharSala() {
+  const lista = document.getElementById("listaPilotos");
+  let html = "";
+  for (let i = 0; i < MAX_PILOTOS; i++) {
+    const j = rede.jogadores[i];
+    if (j) {
+      html += `<div class="${j.id === rede.meuId ? "voce" : ""}"><span><i class="bolinha" style="background:${hexCor(j.cor)}"></i>${escapar(j.nome)}${j.id === rede.meuId ? " (você)" : ""}</span><span>${j.id === "h" ? "👑 dono da sala" : "pronto"}</span></div>`;
+    } else {
+      html += `<div class="vazio"><span>${rede.bots ? "🤖 bot" : "vaga livre"}</span><span></span></div>`;
+    }
+  }
+  lista.innerHTML = html;
+  document.getElementById("infoSala").innerHTML =
+    `Pista: <b>${PISTAS[rede.pista].nome}</b> · Vagas vazias: <b>${rede.bots ? "bots " + NOMES_DIF[rede.bots] : "sem bots"}</b> · 3 voltas`;
+
+  const minha = rede.jogadores.find(j => j.id === rede.meuId);
+  document.getElementById("coresOnline").innerHTML = CORES.map((c, i) => {
+    const usada = rede.jogadores.some(j => j !== minha && j.cor === i);
+    return `<button class="opcao cor ${minha && minha.cor === i ? "selecionada" : ""} ${usada ? "usada" : ""}" data-i="${i}" title="${c.nome}" style="background:${hexCor(i)}"></button>`;
+  }).join("");
+  document.querySelectorAll("#coresOnline .cor").forEach(b => b.addEventListener("click", () => escolherCorOnline(Number(b.dataset.i))));
+
+  document.getElementById("opcoesAnfitriao").style.display = rede.host ? "flex" : "none";
+  document.getElementById("esperaAnfitriao").style.display = rede.host || !rede.jogadores.length ? "none" : "block";
+  if (rede.host) {
+    document.getElementById("pistasOnline").innerHTML = Object.entries(PISTAS).map(([id, p]) =>
+      `<button class="opcao ${id === rede.pista ? "selecionada" : ""}" data-pista="${id}">${p.nome}</button>`).join("");
+    document.querySelectorAll("#pistasOnline .opcao").forEach(b => b.addEventListener("click", () => {
+      rede.pista = b.dataset.pista;
+      construirPista(PISTAS[rede.pista]);
+      enviarSala();
+    }));
+    document.getElementById("botsOnline").innerHTML = [["", "Sem bots"], ["facil", "Bots fáceis"], ["normal", "Bots normais"], ["dificil", "Bots difíceis"]].map(([id, nome]) =>
+      `<button class="opcao ${(rede.bots || "") === id ? "selecionada" : ""}" data-bots="${id}">${nome}</button>`).join("");
+    document.querySelectorAll("#botsOnline .opcao").forEach(b => b.addEventListener("click", () => {
+      rede.bots = b.dataset.bots || null;
+      enviarSala();
+    }));
+    const pode = rede.jogadores.length >= 2 || !!rede.bots;
+    const botao = document.getElementById("botaoComecar");
+    botao.disabled = !pode;
+    botao.textContent = pode ? "COMEÇAR CORRIDA!" : "ESPERANDO AMIGOS…";
+  }
+}
+
+function escolherCorOnline(i) {
+  const minha = rede.jogadores.find(j => j.id === rede.meuId);
+  if (!minha || rede.jogadores.some(j => j !== minha && j.cor === i)) return;
+  corEscolhida = i;
+  if (rede.host) { minha.cor = i; enviarSala(); }
+  else { minha.cor = i; desenharSala(); enviar({ t: "cor", cor: i }); }
+}
+
+// ----- Corrida online -----
+function etiquetaNome(texto, cor) {
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 64;
+  const g = c.getContext("2d");
+  g.font = "bold 32px 'Exo 2', sans-serif";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  const w = Math.min(250, g.measureText(texto).width + 28);
+  g.fillStyle = "rgba(10, 6, 30, 0.75)";
+  g.fillRect(128 - w / 2, 10, w, 44);
+  g.fillStyle = cor;
+  g.fillText(texto, 128, 33);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false, fog: false }));
+  sprite.scale.set(6, 1.5, 1);
+  sprite.position.y = 3.3;
+  return sprite;
+}
+
+function iniciarCorridaOnline(msg) {
+  modo = "online";
+  rede.emCorrida = true;
+  pistaEscolhida = msg.pista;
+  construirPista(PISTAS[msg.pista]);
+  limparCarros();
+  const dif = DIFICULDADES[msg.dif] || DIFICULDADES.normal;
+  msg.lista.forEach((j, i) => {
+    const [gi, gl] = GRID[i];
+    const c = novoCarro(CORES[j.cor].cor, j.nome, j.id === rede.meuId, gi, gl);
+    c.id = j.id;
+    c.bot = j.bot;
+    c.remoto = !c.ehJogador && !(j.bot && rede.host); // os bots são dirigidos pelo anfitrião
+    if (j.bot) { c.vmax = dif.vmax * (0.95 + i * 0.03); c.curva = dif.curva; }
+    if (!c.ehJogador) c.modelo.add(etiquetaNome(j.nome, hexCor(j.cor)));
+    carros.push(c);
+    if (c.ehJogador) jogador = c;
+  });
+  rede.tempoEnvio = 0;
+  rede.tempoTabela = 0;
+  comecarContagem();
+}
+
+function estadoCarro(c) {
+  return [+c.pos.x.toFixed(2), +c.pos.z.toFixed(2), +c.ang.toFixed(3), +c.vel.toFixed(2), +(c.giro || 0).toFixed(2),
+          c.usandoNitro ? 1 : 0, c.idx, c.voltas, c.passouMeio ? 1 : 0, c.terminou ? 1 : 0, +(c.tempoFinal || 0).toFixed(3)];
+}
+
+function aplicarEstado(c, s) {
+  c.net = { x: s[0], z: s[1], ang: s[2], vel: s[3], t: performance.now() };
+  c.giro = s[4];
+  c.usandoNitro = !!s[5];
+  c.idx = ((s[6] % N) + N) % N;
+  c.voltas = s[7];
+  c.passouMeio = !!s[8];
+  if (s[9] && !c.terminou) { c.terminou = true; c.tempoFinal = s[10]; }
+  c.ultimoEstado = s;
+}
+
+// Carro de outro jogador: anda na direção que estava indo e vai corrigindo para a última posição recebida
+function atualizarRemoto(c, dt) {
+  const n = c.net;
+  if (!n) return;
+  const idade = Math.min(0.3, (performance.now() - n.t) / 1000);
+  const px = n.x + Math.sin(n.ang) * n.vel * idade, pz = n.z + Math.cos(n.ang) * n.vel * idade;
+  const k = Math.min(1, dt * 10);
+  if (Math.hypot(px - c.pos.x, pz - c.pos.z) > 25) c.pos.set(px, 0, pz);
+  else { c.pos.x += (px - c.pos.x) * k; c.pos.z += (pz - c.pos.z) * k; }
+  let d = n.ang - c.ang;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  c.ang += d * k;
+  c.vel = n.vel;
+}
+
+function simularOutros(dt) {
+  carros.forEach(c => { if (!c.ehJogador && !c.remoto) atualizarIA(c, dt); });
+  carros.forEach(c => c.remoto ? atualizarRemoto(c, dt) : moverCarro(c, dt));
+}
+
+function redeCorrida(dt) {
+  rede.tempoEnvio -= dt;
+  if (rede.tempoEnvio > 0) return;
+  rede.tempoEnvio = 0.05;
+  if (rede.host) {
+    const c = {};
+    carros.forEach(x => { const st = x.remoto ? x.ultimoEstado : estadoCarro(x); if (st) c[x.id] = st; });
+    paraTodos({ t: "estado", c });
+  } else {
+    enviar({ t: "eu", s: estadoCarro(jogador) });
+  }
+}
+
+function voltarSala() {
+  estado = "menu";
+  pararSom();
+  limparCarros();
+  document.getElementById("hud").classList.add("escondido");
+  if (rede.host) {
+    rede.emCorrida = false;
+    paraTodos({ t: "fimCorrida" });
+    enviarSala();
+  }
+  construirPista(PISTAS[rede.pista]);
+  if (!rede.peer) return irMenu();
+  mostrarParteOnline("sala");
+  desenharSala();
+  mostrarTela("online");
+}
+
+document.getElementById("botaoOnline").addEventListener("click", abrirOnline);
+document.getElementById("botaoCriarSala").addEventListener("click", () => criarSala());
+document.getElementById("botaoEntrarSala").addEventListener("click", entrarSala);
+document.getElementById("botaoComecar").addEventListener("click", comecarCorridaOnline);
+document.getElementById("botaoSairOnline").addEventListener("click", () => {
+  sairOnline();
+  document.getElementById("erroOnline").textContent = "";
+  desenharPistas();
+  construirPista(PISTAS[pistaEscolhida]);
+  mostrarTela("menu");
+});
+document.getElementById("botaoCopiar").addEventListener("click", () => {
+  const codigo = document.getElementById("codigoSala").textContent;
+  if (navigator.clipboard) navigator.clipboard.writeText(codigo).catch(() => {});
+  document.getElementById("botaoCopiar").textContent = "✔ COPIADO";
+  setTimeout(() => document.getElementById("botaoCopiar").textContent = "📋 COPIAR CÓDIGO", 1500);
+});
 
 // ===== Laço principal =====
 let ultimo = performance.now();
@@ -970,14 +1690,26 @@ function laco(agora) {
   } else if (estado === "correndo") {
     tempoCorrida += dt;
     atualizarJogador(dt);
-    carros.forEach(c => { if (!c.ehJogador) atualizarIA(c, dt); });
-    carros.forEach(c => moverCarro(c, dt));
+    simularOutros(dt);
     colisoes();
+  } else if (estado === "fim" && modo === "online" && jogador) {
+    // você já chegou, mas a corrida dos outros continua (e o anfitrião ainda dirige os bots)
+    jogador.vel *= 1 - 1.5 * dt;
+    simularOutros(dt);
+    colisoes();
+    rede.tempoTabela -= dt;
+    if (rede.tempoTabela <= 0) { rede.tempoTabela = 0.5; preencherTabela(); }
   }
+  if (modo === "online" && jogador && estado !== "menu") redeCorrida(dt);
 
   if (jogador && estado !== "menu") {
     carros.forEach(c => {
-      c.modelo.position.set(c.pos.x, 0, c.pos.z);
+      // altura da pista embaixo do carro e inclinação na subida
+      c.y += (amostras[c.idx].y - c.y) * Math.min(1, dt * 12);
+      const t = tangentes[c.idx];
+      const frente = Math.sin(c.ang) * t.x + Math.cos(c.ang) * t.z;
+      c.modelo.position.set(c.pos.x, c.y, c.pos.z);
+      c.modelo.rotation.x = -Math.atan(inclinacoes[c.idx] * frente);
       c.modelo.rotation.y = c.ang;
       c.modelo.rotation.z = -(c.giro || 0) * Math.min(1, Math.abs(c.vel) / VMAX) * 0.06; // inclina na curva
       c.modelo.userData.rodas.forEach(r => r.rotation.x += c.vel * dt / 0.42);
@@ -992,7 +1724,7 @@ function laco(agora) {
     // menu: câmera girando devagar em volta da pista escolhida
     const a = agora / 9000;
     const r = raioPista + 140;
-    camera.position.set(centro.x + Math.cos(a) * r, 110 + raioPista * 0.15, centro.z + Math.sin(a) * r);
+    camera.position.set(centro.x + Math.cos(a) * r, 150 + raioPista * 0.15, centro.z + Math.sin(a) * r);
     camera.lookAt(centro);
   }
   renderer.render(cena, camera);

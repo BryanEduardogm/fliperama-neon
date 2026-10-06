@@ -10,7 +10,7 @@
 |---|---|---|
 | Zona de Combate | Tiro em 1ª pessoa contra bots ou **X1 online com amigo** (6 mapas, 24 armas) | PC |
 | Punho Neon | Luta 2D com modo história e **online com amigo** | PC |
-| Turbo Neon | Corrida synthwave com 4 pistas | PC |
+| Turbo Neon | Corrida synthwave com 6 pistas e **online com até 4 pilotos** | PC |
 | Neon Morto | Terror num fliperama abandonado (4 mapas) | PC |
 | Mundo de Blocos | Construção 3D | PC |
 | Defesa Neon | Estratégia (tower defense): 5 torres, 3 mapas, 30 ondas | PC + celular |
@@ -26,7 +26,7 @@
 ## Como funciona
 
 - Cada jogo é um único arquivo `.html`, com HTML, CSS e JavaScript juntos.
-- Os jogos 3D usam [Three.js](https://threejs.org/); os modos online do Punho Neon e da Zona de Combate usam [PeerJS](https://peerjs.com/).
+- Os jogos 3D usam [Three.js](https://threejs.org/); os modos online do Punho Neon, da Zona de Combate e do Turbo Neon usam [PeerJS](https://peerjs.com/).
 - Músicas e efeitos sonoros são gerados pelo próprio navegador (Web Audio), sem arquivos de áudio.
 - Os recordes ficam salvos só no navegador de quem joga.
 
