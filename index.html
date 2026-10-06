@@ -140,7 +140,8 @@
   }
   .jogo:hover { transform: translateY(-6px); border-color: var(--cor); box-shadow: 0 0 26px color-mix(in srgb, var(--cor) 55%, transparent); }
   .capa {
-    height: 140px;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
     display: flex; align-items: center; justify-content: center;
     font-size: 4rem;
     background:
@@ -149,8 +150,12 @@
       #0e0928;
     position: relative;
   }
-  .capa .flutuar { display: inline-block; animation: flutuar 3s ease-in-out infinite; filter: drop-shadow(0 0 14px var(--cor)); }
-  @keyframes flutuar { 50% { transform: translateY(-8px) rotate(-4deg); } }
+  /* foto do jogo: aproxima um pouco ao passar o mouse; a faixa embaixo puxa a cor do jogo */
+  .capa .foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s; }
+  .jogo:hover .capa .foto { transform: scale(1.06); }
+  .capa::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, transparent 55%, rgba(11, 8, 32, 0.55)), linear-gradient(0deg, color-mix(in srgb, var(--cor) 70%, transparent) 0 3px, transparent 3px); }
+  .selo, .categoria { z-index: 1; }
   .selo { position: absolute; top: 10px; left: 10px; font-size: 0.7rem; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: rgba(11, 8, 32, 0.85); border: 1px solid var(--verde); color: var(--verde); }
   .selo.pc { border-color: var(--rosa); color: var(--rosa); }
   .categoria { position: absolute; top: 10px; right: 10px; font-size: 0.7rem; color: var(--suave); background: rgba(11, 8, 32, 0.85); padding: 3px 9px; border-radius: 999px; }
@@ -521,7 +526,7 @@
         <div class="capa">
           <span class="selo ${j.celular ? "" : "pc"}">${j.celular ? "PC + Celular" : "Só PC"}</span>
           <span class="categoria">${j.rotulo}</span>
-          <span class="flutuar">${j.icone}</span>
+          <img class="foto" src="capas/${j.arquivo.replace(".html", "")}.jpg" alt="Tela do jogo ${j.nome}" loading="lazy" width="640" height="360">
         </div>
         <div class="info-jogo">
           <h3>${j.nome}</h3>
