@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Defesa Neon · Fliperama Neon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Exo+2:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fundo: #0b0820; --painel: rgba(18, 10, 44, 0.92); --borda: #3a2a7a; --texto: #f6f0ff; --suave: #b3a6e0;
+    --ciano: #00f0ff; --rosa: #ff2bd6; --amarelo: #ffe600; --verde: #39ff88; --vermelho: #ff2a4a;
+    --titulo: "Press Start 2P", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--fundo); color: var(--texto); font-family: "Exo 2", "Segoe UI", Arial, sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+
+  /* ===== Jogo ===== */
+  #jogo { position: fixed; inset: 0; display: flex; flex-direction: column; }
+  #topo { display: flex; align-items: center; gap: 8px 16px; padding: 8px 12px; background: var(--painel); border-bottom: 1px solid var(--borda); flex-wrap: wrap; }
+  .info { font-weight: 900; font-size: 1.05rem; white-space: nowrap; }
+  .info small { color: var(--suave); font-weight: 400; font-size: 0.65rem; letter-spacing: 2px; display: block; }
+  .info.vidas b { color: var(--vermelho); }
+  .info.dinheiro b { color: var(--amarelo); }
+  .info.onda b { color: var(--ciano); }
+  .espaco { flex: 1; }
+  .btn { font-family: inherit; font-weight: 700; background: rgba(0, 0, 0, 0.35); color: var(--texto); border: 2px solid var(--borda); border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 0.85rem; white-space: nowrap; }
+  .btn:hover:not(:disabled) { border-color: var(--ciano); }
+  .btn.destaque { background: linear-gradient(90deg, var(--rosa), #b06bff); border-color: transparent; box-shadow: 0 0 16px rgba(255, 43, 214, 0.5); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  #area { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; }
+  #tela { border-radius: 6px; box-shadow: 0 0 0 2px var(--borda), 0 0 30px rgba(0, 240, 255, 0.15); cursor: pointer; }
+  #aviso { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); font-family: var(--titulo); font-size: clamp(0.65rem, 2vw, 1.05rem); color: var(--amarelo);
+    text-shadow: 0 0 10px var(--amarelo); pointer-events: none; opacity: 0; transition: opacity 0.3s; text-align: center; white-space: nowrap; }
+  #flash { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 90px rgba(255, 42, 74, 0.85); opacity: 0; transition: opacity 0.5s; }
+
+  #barraInferior { display: flex; gap: 10px; padding: 8px 12px; background: var(--painel); border-top: 1px solid var(--borda); align-items: stretch; flex-wrap: wrap; justify-content: center; }
+  #loja { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .item { position: relative; width: 88px; padding: 6px 4px 5px; text-align: center; background: rgba(0, 0, 0, 0.35); border: 2px solid var(--borda); border-radius: 10px; cursor: pointer; color: var(--texto); font-family: inherit; }
+  .item canvas { display: block; margin: 0 auto 2px; }
+  .item b { display: block; font-size: 0.8rem; }
+  .item span { color: var(--amarelo); font-size: 0.78rem; font-weight: 700; }
+  .item i { position: absolute; top: 3px; left: 6px; font-style: normal; font-size: 0.65rem; color: var(--suave); }
+  .item.selecionado { border-color: var(--amarelo); box-shadow: 0 0 14px rgba(255, 230, 0, 0.45); }
+  .item.caro { opacity: 0.45; }
+  #painel { min-width: 260px; max-width: 340px; flex: 1; background: rgba(0, 0, 0, 0.35); border: 2px solid var(--borda); border-radius: 10px; padding: 8px 12px; font-size: 0.8rem; color: var(--suave); line-height: 1.5; }
+  #painel h3 { color: var(--texto); font-size: 0.95rem; }
+  #painel h3 small { color: var(--amarelo); font-size: 0.75rem; margin-left: 6px; }
+  #painel .stats b { color: var(--texto); }
+  #painel .botoes { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  #painel .botoes .btn { padding: 6px 10px; font-size: 0.78rem; }
+
+  /* ===== Telas ===== */
+  .tela {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    gap: 16px; padding: 20px 16px; overflow-y: auto; text-align: center; touch-action: pan-y;
+    background: linear-gradient(180deg, rgba(14, 4, 40, 0.96), rgba(40, 10, 80, 0.94) 70%, rgba(0, 120, 160, 0.75));
+  }
+  .tela > :first-child { margin-top: auto; }
+  .tela > :last-child { margin-bottom: auto; }
+  .tela.escondida { display: none; }
+  .voltar { align-self: flex-start; color: var(--suave); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--borda); padding: 6px 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); }
+  .voltar:hover { color: var(--ciano); border-color: var(--ciano); }
+  .logo { font-family: var(--titulo); font-size: clamp(1.6rem, 6vw, 3.2rem); line-height: 1.3; color: var(--ciano);
+    text-shadow: 0 0 12px var(--ciano), 0 0 30px rgba(0, 240, 255, 0.6), 4px 4px 0 #2a0a4a; }
+  .logo span { color: var(--rosa); text-shadow: 0 0 12px var(--rosa), 0 0 30px rgba(255, 43, 214, 0.6), 4px 4px 0 #2a0a4a; }
+  .sub { color: var(--suave); letter-spacing: 3px; font-size: 0.85rem; }
+  .secao h2 { font-size: 0.8rem; letter-spacing: 3px; color: var(--suave); margin-bottom: 10px; }
+  .opcoes { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .opcao { background: var(--painel); border: 2px solid var(--borda); border-radius: 12px; padding: 10px 14px; cursor: pointer; color: var(--texto); font-family: inherit; font-weight: 700; font-size: 0.95rem; min-width: 110px; }
+  .opcao small { display: block; font-weight: 400; color: var(--suave); font-size: 0.75rem; }
+  .opcao .rec { display: block; color: var(--amarelo); font-size: 0.72rem; margin-top: 4px; }
+  .opcao.selecionada { border-color: var(--amarelo); box-shadow: 0 0 16px rgba(255, 230, 0, 0.45); }
+  .opcao.mapa { width: 190px; }
+  .opcao.mapa canvas { display: block; width: 100%; border-radius: 6px; margin-bottom: 6px; }
+  .botao { font-family: var(--titulo); font-size: 1rem; background: linear-gradient(90deg, var(--rosa), #b06bff); color: #fff; border: none; border-radius: 10px; padding: 16px 40px; cursor: pointer; box-shadow: 0 0 24px rgba(255, 43, 214, 0.55), 0 5px 0 #6a1a8a; }
+  .botao:hover { transform: translateY(-2px); }
+  .botao.sec { background: rgba(0, 0, 0, 0.35); box-shadow: 0 0 0 2px var(--borda); }
+  .controles { font-size: 0.85rem; color: var(--suave); line-height: 2; max-width: 700px; }
+  .controles b { color: var(--texto); background: rgba(0, 0, 0, 0.35); padding: 2px 8px; border-radius: 4px; }
+  .titulo-fim { font-family: var(--titulo); font-size: clamp(1.4rem, 5vw, 2.6rem); line-height: 1.3; }
+  .titulo-fim.vitoria { color: var(--verde); text-shadow: 0 0 16px var(--verde); }
+  .titulo-fim.derrota { color: var(--vermelho); text-shadow: 0 0 16px var(--vermelho); }
+  .resultado { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: min(420px, 92vw); }
+  .resultado div { background: var(--painel); border: 1px solid var(--borda); border-radius: 10px; padding: 10px; }
+  .resultado small { display: block; color: var(--suave); font-size: 0.75rem; }
+  .resultado b { font-size: 1.3rem; }
+  .linha-botoes { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  @media (max-width: 600px) {
+    #topo { gap: 6px 12px; padding: 6px 8px; }
+    .btn { padding: 6px 9px; font-size: 0.78rem; }
+    #barraInferior { padding: 6px; gap: 6px; }
+    .item { width: 62px; padding: 4px 2px; }
+    .item canvas { width: 30px; height: 30px; }
+    .item b { font-size: 0.7rem; }
+    #painel { min-width: 0; font-size: 0.75rem; }
+  }
+  .novo-recorde { font-family: var(--titulo); font-size: 0.75rem; color: var(--amarelo); text-shadow: 0 0 10px var(--amarelo); }
+</style>
+</head>
+<body>
+
+<!-- ===== Jogo ===== -->
+<div id="jogo">
+  <div id="topo">
+    <div class="info vidas"><small>VIDAS</small>❤️ <b id="vidas">20</b></div>
+    <div class="info dinheiro"><small>DINHEIRO</small>💰 <b id="dinheiro">0</b></div>
+    <div class="info onda"><small>ONDA</small>🌊 <b id="onda">0</b> / 30</div>
+    <div class="info"><small>INIMIGOS</small>👾 <b id="qtdInimigos">0</b></div>
+    <div class="espaco"></div>
+    <button class="btn" id="botaoVelocidade" title="Velocidade (F)">▶ 1x</button>
+    <button class="btn" id="botaoAuto" title="Começa a próxima onda sozinho">AUTO: NÃO</button>
+    <button class="btn" id="botaoSom" title="Som (M)">🔊</button>
+    <button class="btn" id="botaoPausa" title="Pausar (P)">⏸</button>
+    <button class="btn destaque" id="botaoOnda">PRÓXIMA ONDA ▶</button>
+  </div>
+  <div id="area">
+    <canvas id="tela"></canvas>
+    <div id="aviso"></div>
+    <div id="flash"></div>
+  </div>
+  <div id="barraInferior">
+    <div id="loja"></div>
+    <div id="painel"></div>
+  </div>
+</div>
+
+<!-- ===== Menu ===== -->
+<div class="tela" id="menu">
+  <a href="index.html" class="voltar">← Voltar ao Fliperama</a>
+  <div class="logo">DEFESA <span>NEON</span></div>
+  <div class="sub">CONSTRUA TORRES · SEGURE AS 30 ONDAS</div>
+
+  <div class="secao">
+    <h2>ESCOLHA O MAPA</h2>
+    <div class="opcoes" id="opcoesMapa"></div>
+  </div>
+
+  <div class="secao">
+    <h2>DIFICULDADE</h2>
+    <div class="opcoes" id="opcoesDificuldade"></div>
+  </div>
+
+  <button class="botao" id="botaoJogar">JOGAR</button>
+
+  <div class="controles">
+    <b>Clique</b> numa torre da loja e depois num espaço vazio para construir &nbsp;·&nbsp; <b>Clique</b> numa torre para melhorar ou vender<br>
+    <b>1</b>–<b>5</b> escolher torre &nbsp; <b>Espaço</b> próxima onda &nbsp; <b>U</b> melhorar &nbsp; <b>V</b> vender &nbsp; <b>F</b> velocidade &nbsp; <b>Esc</b> cancelar &nbsp; <b>P</b> pausar &nbsp; <b>M</b> som
+  </div>
+</div>
+
+<!-- ===== Pausa ===== -->
+<div class="tela escondida" id="pausa">
+  <div class="titulo-fim vitoria">PAUSADO</div>
+  <div class="linha-botoes">
+    <button class="botao" id="botaoContinuar">CONTINUAR</button>
+    <button class="botao sec" id="botaoMenuPausa">MENU</button>
+  </div>
+</div>
+
+<!-- ===== Fim ===== -->
+<div class="tela escondida" id="fim">
+  <div class="titulo-fim" id="tituloFim"></div>
+  <div class="novo-recorde" id="novoRecorde"></div>
+  <div class="resultado" id="resultado"></div>
+  <div class="linha-botoes">
+    <button class="botao" id="botaoDeNovo">JOGAR DE NOVO</button>
+    <button class="botao sec" id="botaoMenuFim">MENU</button>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+//  DEFESA NEON — tower defense: monte torres ao lado do caminho
+//  e não deixe os inimigos chegarem ao fim.
+//  Tudo é medido em "células" da grade (16 × 10); só o desenho usa pixels.
+// =====================================================================
+const COLS = 16, LINHAS = 10, TOTAL_ONDAS = 30;
+
+// ===== Mapas: cada caminho é uma lista de pontos da grade (coluna, linha) =====
+const MAPAS = {
+  circuito: { nome: "Circuito", desc: "Zigue-zague clássico. Bom para começar.", dinheiro: 220,
+    caminhos: [[[-1, 2], [3, 2], [3, 7], [7, 7], [7, 2], [11, 2], [11, 7], [16, 7]]] },
+  serpente: { nome: "Serpente", desc: "Caminho comprido que dá a volta no mapa.", dinheiro: 200,
+    caminhos: [[[-1, 1], [13, 1], [13, 4], [2, 4], [2, 8], [16, 8]]] },
+  cruzamento: { nome: "Cruzamento", desc: "Duas entradas! Inimigos vêm de dois lados.", dinheiro: 260,
+    caminhos: [[[-1, 3], [5, 3], [5, 8], [11, 8], [11, 4], [16, 4]],
+               [[2, 10], [2, 6], [5, 6], [5, 8], [11, 8], [11, 4], [16, 4]]] }
+};
+
+const DIFICULDADES = {
+  facil:   { nome: "Fácil",   desc: "30 vidas, inimigos mais fracos", vida: 0.8,  vidas: 30 },
+  normal:  { nome: "Normal",  desc: "20 vidas",                       vida: 1,    vidas: 20 },
+  dificil: { nome: "Difícil", desc: "12 vidas, inimigos mais fortes", vida: 1.3,  vidas: 12 }
+};
+
+// ===== Torres =====
+const TORRES = {
+  laser:  { nome: "Laser",  cor: "#00f0ff", custo: 50,  alcance: 2.5, cadencia: 0.32, dano: 9,
+            desc: "Atira rápido e acerta tudo, até voadores." },
+  canhao: { nome: "Canhão", cor: "#ff2bd6", custo: 80,  alcance: 2.3, cadencia: 1.15, dano: 30, area: 0.95, soChao: true,
+            desc: "Bala que explode em área. Não acerta voadores." },
+  gelo:   { nome: "Gelo",   cor: "#7ab8ff", custo: 70,  alcance: 2.1, cadencia: 0.9,  dano: 4,  area: 0.8, lento: 0.5, tempoLento: 1.6,
+            desc: "Congela em área: os inimigos ficam lentos." },
+  raio:   { nome: "Raio",   cor: "#ffe600", custo: 120, alcance: 2.4, cadencia: 1.0,  dano: 22, saltos: 3,
+            desc: "O raio pula de um inimigo para outro." },
+  sniper: { nome: "Sniper", cor: "#39ff88", custo: 150, alcance: 5.5, cadencia: 2.0,  dano: 85, alvo: "forte",
+            desc: "Alcance enorme. Mira no inimigo mais forte." }
+};
+const ORDEM_TORRES = ["laser", "canhao", "gelo", "raio", "sniper"];
+const NOMES_ALVO = { primeiro: "PRIMEIRO", ultimo: "ÚLTIMO", forte: "MAIS FORTE", perto: "MAIS PERTO" };
+const CICLO_ALVO = ["primeiro", "ultimo", "forte", "perto"];
+
+// Atributos da torre conforme o nível (1 a 3)
+function stats(t) {
+  const b = TORRES[t.tipo], n = t.nivel - 1;
+  return {
+    dano: b.dano * Math.pow(1.6, n),
+    alcance: b.alcance + 0.35 * n,
+    cadencia: b.cadencia * Math.pow(0.87, n),
+    area: b.area ? b.area + 0.12 * n : 0,
+    lento: b.lento ? b.lento - 0.07 * n : 1,
+    saltos: b.saltos ? b.saltos + n : 0
+  };
+}
+const custoMelhoria = t => t.nivel >= 3 ? null : Math.round(TORRES[t.tipo].custo * (t.nivel === 1 ? 0.8 : 1.4));
+const valorVenda = t => Math.round(t.investido * 0.7);
+
+// ===== Inimigos =====
+const INIMIGOS = {
+  comum:      { nome: "Comum",      vida: 32,   vel: 1.5,  premio: 5,   raio: 0.22, cor: "#ff2bd6", forma: "circulo",   dano: 1 },
+  rapido:     { nome: "Rápido",     vida: 20,   vel: 2.7,  premio: 5,   raio: 0.18, cor: "#ffe600", forma: "triangulo", dano: 1 },
+  tanque:     { nome: "Tanque",     vida: 120,  vel: 0.85, premio: 12,  raio: 0.3,  cor: "#ff7a3d", forma: "quadrado",  dano: 2, armadura: 3 },
+  voador:     { nome: "Voador",     vida: 28,   vel: 1.9,  premio: 7,   raio: 0.22, cor: "#b06bff", forma: "losango",   dano: 1, voa: true },
+  curandeiro: { nome: "Curandeiro", vida: 50,   vel: 1.25, premio: 11,  raio: 0.24, cor: "#39ff88", forma: "cruz",      dano: 1, cura: true },
+  chefe:      { nome: "Chefão",     vida: 1100, vel: 0.6,  premio: 120, raio: 0.45, cor: "#ff2a4a", forma: "hexagono",  dano: 10, armadura: 5, chefe: true }
+};
+// Equilíbrio do jogo: quanto a vida dos inimigos cresce por onda e o bônus ao terminar cada onda
+const BALANCO = { vidaLinear: 0.2, vidaQuadrado: 0.02, bonusBase: 10, bonusOnda: 2, premio: 0.85 };
+const vidaDaOnda = n => 1 + BALANCO.vidaLinear * (n - 1) + BALANCO.vidaQuadrado * (n - 1) * (n - 1);
+
+function montarOnda(n) {
+  const lista = [];
+  const enxame = n % 5 === 0 && n % 10 !== 0; // ondas 5, 15, 25: um monte de rápidos
+  const qtd = Math.round((6 + n * 1.6) * (enxame ? 1.6 : 1));
+  for (let i = 0; i < qtd; i++) {
+    let tipo = "comum";
+    const r = Math.random();
+    if (enxame) tipo = r < 0.75 ? "rapido" : "comum";
+    else if (n >= 3 && r < 0.22) tipo = "rapido";
+    else if (n >= 5 && r < 0.37) tipo = "tanque";
+    else if (n >= 7 && r < 0.52) tipo = "voador";
+    else if (n >= 10 && r < 0.6) tipo = "curandeiro";
+    lista.push(tipo);
+  }
+  if (n % 10 === 0) lista.push("chefe");
+  if (n === TOTAL_ONDAS) lista.push("chefe");
+  return lista;
+}
+
+// ===== Caminhos =====
+function prepararCaminho(pontos) {
+  const pts = pontos.map(([c, l]) => ({ x: c + 0.5, y: l + 0.5 }));
+  const segs = [];
+  let total = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    segs.push({ a, b, len, ini: total, ang: Math.atan2(b.y - a.y, b.x - a.x) });
+    total += len;
+  }
+  return { pontos, pts, segs, total };
+}
+
+function posNoCaminho(cam, d) {
+  let s = cam.segs[cam.segs.length - 1];
+  for (const seg of cam.segs) if (d <= seg.ini + seg.len) { s = seg; break; }
+  const t = Math.max(0, Math.min(1, (d - s.ini) / s.len));
+  return { x: s.a.x + (s.b.x - s.a.x) * t, y: s.a.y + (s.b.y - s.a.y) * t, ang: s.ang };
+}
+
+// marca as células do caminho (onde não pode construir)
+function marcarCaminho(ocupado, pontos) {
+  for (let i = 0; i < pontos.length - 1; i++) {
+    let [c, l] = pontos[i];
+    const [c2, l2] = pontos[i + 1];
+    const dc = Math.sign(c2 - c), dl = Math.sign(l2 - l);
+    while (true) {
+      if (c >= 0 && c < COLS && l >= 0 && l < LINHAS) ocupado[l][c] = 1;
+      if (c === c2 && l === l2) break;
+      c += dc; l += dl;
+    }
+  }
+}
+
+// ===== Recordes =====
+function lerRecorde(mapa) { try { return Number(localStorage.getItem("fliperama_defesa_" + mapa)) || 0; } catch (e) { return 0; } }
+function salvarRecorde(mapa, ondas) {
+  try {
+    let novo = false;
+    if (ondas > lerRecorde(mapa)) { localStorage.setItem("fliperama_defesa_" + mapa, ondas); novo = true; }
+    if (ondas > (Number(localStorage.getItem("fliperama_defesa")) || 0)) localStorage.setItem("fliperama_defesa", ondas);
+    return novo;
+  } catch (e) { return false; }
+}
+
+// ===== Sons (gerados pelo navegador) =====
+let audio = null, saida = null, bufRuido = null, somLigado = true;
+try { somLigado = localStorage.getItem("fliperama_defesa_som") !== "0"; } catch (e) {}
+function ctxAudio() {
+  if (!audio) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    audio = new AC();
+    saida = audio.createGain();
+    saida.gain.value = somLigado ? 0.9 : 0;
+    saida.connect(audio.destination);
+    bufRuido = audio.createBuffer(1, audio.sampleRate, audio.sampleRate);
+    const d = bufRuido.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (audio.state === "suspended") audio.resume();
+  return audio;
+}
+function tom(freq, dur, vol, tipo = "square", atraso = 0, deslize = 1, inicioAbs = null) {
+  if (!audio) return;
+  const t = inicioAbs !== null ? inicioAbs : audio.currentTime + atraso;
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.type = tipo;
+  o.frequency.setValueAtTime(freq, t);
+  if (deslize !== 1) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq * deslize), t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(saida);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function ruido(dur, vol, freq = 1200, atraso = 0, inicioAbs = null) {
+  if (!audio) return;
+  const t = inicioAbs !== null ? inicioAbs : audio.currentTime + atraso;
+  const s = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+  s.buffer = bufRuido;
+  f.type = "lowpass"; f.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(saida);
+  s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
+}
+// evita dezenas de sons iguais no mesmo instante
+const ultimoSom = {};
+function podeSom(nome, intervalo = 0.06) {
+  if (!audio) return false;
+  if (audio.currentTime - (ultimoSom[nome] || 0) < intervalo) return false;
+  ultimoSom[nome] = audio.currentTime;
+  return true;
+}
+const SONS = {
+  laser:  () => podeSom("laser", 0.07) && tom(1500, 0.05, 0.025, "square", 0, 0.45),
+  canhao: () => podeSom("canhao") && tom(170, 0.12, 0.07, "triangle", 0, 0.45),
+  boom:   () => podeSom("boom", 0.08) && ruido(0.28, 0.12, 700),
+  gelo:   () => podeSom("gelo") && tom(2300, 0.1, 0.025, "sine", 0, 0.6),
+  raio:   () => { if (podeSom("raio")) { ruido(0.12, 0.07, 4000); tom(95, 0.12, 0.05, "sawtooth"); } },
+  sniper: () => { if (podeSom("sniper")) { ruido(0.1, 0.12, 2500); tom(320, 0.16, 0.05, "square", 0, 0.3); } },
+  morte:  () => podeSom("morte", 0.05) && tom(650, 0.07, 0.035, "square", 0, 1.7),
+  vazou:  () => { tom(160, 0.35, 0.12, "sawtooth", 0, 0.45); tom(110, 0.35, 0.08, "square", 0.05, 0.5); },
+  construir: () => { tom(520, 0.06, 0.07, "square"); tom(780, 0.09, 0.07, "square", 0.06); },
+  melhorar: () => { tom(520, 0.06, 0.06, "square"); tom(780, 0.06, 0.06, "square", 0.06); tom(1040, 0.1, 0.06, "square", 0.12); },
+  vender: () => { tom(900, 0.06, 0.06, "triangle"); tom(600, 0.08, 0.06, "triangle", 0.06); },
+  erro:   () => tom(150, 0.15, 0.08, "square"),
+  clique: () => tom(900, 0.03, 0.05, "square"),
+  onda:   () => [440, 554, 659, 880].forEach((f, i) => tom(f, 0.12, 0.06, "square", i * 0.08)),
+  fimOnda: () => [660, 880, 1320].forEach((f, i) => tom(f, 0.1, 0.05, "triangle", i * 0.07)),
+  chefe:  () => { tom(80, 0.9, 0.12, "sawtooth", 0, 0.7); tom(60, 0.9, 0.1, "square", 0.1, 0.7); }
+};
+
+// Música synthwave em loop (agendada um pouquinho à frente para não engasgar)
+const ACORDES = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]]; // Lá menor, Fá, Dó, Sol
+const midi = n => 440 * Math.pow(2, (n - 69) / 12);
+let timerMusica = null, proxNota = 0, passoMusica = 0;
+function tocarMusica() {
+  if (timerMusica || !ctxAudio()) return;
+  proxNota = audio.currentTime + 0.1;
+  passoMusica = 0;
+  timerMusica = setInterval(agendarMusica, 25);
+}
+function pararMusica() { clearInterval(timerMusica); timerMusica = null; }
+function agendarMusica() {
+  const dur = 60 / 112 / 4; // semicolcheia a 112 BPM
+  while (proxNota < audio.currentTime + 0.12) {
+    const ac = ACORDES[Math.floor(passoMusica / 16) % 4];
+    const s = passoMusica % 16;
+    if (s % 2 === 0) tom(midi(ac[0] - 24), dur * 1.8, 0.045, "triangle", 0, 1, proxNota);
+    tom(midi(ac[[0, 1, 2, 1][s % 4]] + 12 + (s >= 8 ? 12 : 0)), dur * 0.8, 0.012, "square", 0, 1, proxNota);
+    if (s % 4 === 2) ruido(0.03, 0.025, 7000, 0, proxNota);
+    if (s % 8 === 0) tom(130, 0.15, 0.09, "sine", 0, 0.3, proxNota);
+    if (s % 8 === 4) ruido(0.1, 0.04, 2500, 0, proxNota);
+    proxNota += dur;
+    passoMusica++;
+  }
+}
+function alternarSom() {
+  somLigado = !somLigado;
+  try { localStorage.setItem("fliperama_defesa_som", somLigado ? "1" : "0"); } catch (e) {}
+  if (saida) saida.gain.value = somLigado ? 0.9 : 0;
+  document.getElementById("botaoSom").textContent = somLigado ? "🔊" : "🔇";
+}
+
+// ===== Canvas e desenho =====
+const cv = document.getElementById("tela"), ctx = cv.getContext("2d");
+let cel = 40, dpr = 1, fundo = null;
+
+// brilho redondo pré-desenhado por cor (mais leve que shadowBlur a cada quadro)
+const cacheBrilho = {};
+function brilho(cor) {
+  if (!cacheBrilho[cor]) {
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const g = c.getContext("2d");
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, cor);
+    gr.addColorStop(0.35, cor + "88");
+    gr.addColorStop(1, cor + "00");
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 64, 64);
+    cacheBrilho[cor] = c;
+  }
+  return cacheBrilho[cor];
+}
+
+function retArredondado(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+function redimensionar() {
+  const area = document.getElementById("area");
+  const w = area.clientWidth - 12, h = area.clientHeight - 12;
+  cel = Math.max(14, Math.floor(Math.min(w / COLS, h / LINHAS)));
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = COLS * cel * dpr;
+  cv.height = LINHAS * cel * dpr;
+  cv.style.width = COLS * cel + "px";
+  cv.style.height = LINHAS * cel + "px";
+  if (jogo) desenharFundo();
+}
+window.addEventListener("resize", redimensionar);
+
+// Desenha o cenário uma vez (grade + caminho brilhante) numa imagem guardada
+function desenharCaminhos(g, mapa, s, comBrilho) {
+  g.lineJoin = "round";
+  g.lineCap = "butt";
+  const linha = (pontos, largura, cor) => {
+    g.strokeStyle = cor;
+    g.lineWidth = largura;
+    g.beginPath();
+    pontos.forEach(([c, l], i) => i ? g.lineTo((c + 0.5) * s, (l + 0.5) * s) : g.moveTo((c + 0.5) * s, (l + 0.5) * s));
+    g.stroke();
+  };
+  mapa.caminhos.forEach(p => {
+    if (comBrilho) { g.shadowColor = "#00f0ff"; g.shadowBlur = s * 0.5; }
+    linha(p, s * 0.9, "#00f0ff");
+    g.shadowBlur = 0;
+  });
+  mapa.caminhos.forEach(p => linha(p, s * 0.78, "#1a0f3d"));
+  mapa.caminhos.forEach(p => linha(p, s * 0.06, "rgba(0, 240, 255, 0.25)"));
+}
+
+function desenharFundo() {
+  fundo = document.createElement("canvas");
+  fundo.width = cv.width;
+  fundo.height = cv.height;
+  const g = fundo.getContext("2d");
+  g.scale(dpr, dpr);
+  const W = COLS * cel, H = LINHAS * cel;
+  const gr = g.createLinearGradient(0, 0, 0, H);
+  gr.addColorStop(0, "#0d0828");
+  gr.addColorStop(1, "#1a0a33");
+  g.fillStyle = gr;
+  g.fillRect(0, 0, W, H);
+  // grade
+  g.strokeStyle = "rgba(176, 107, 255, 0.12)";
+  g.lineWidth = 1;
+  for (let c = 0; c <= COLS; c++) { g.beginPath(); g.moveTo(c * cel + 0.5, 0); g.lineTo(c * cel + 0.5, H); g.stroke(); }
+  for (let l = 0; l <= LINHAS; l++) { g.beginPath(); g.moveTo(0, l * cel + 0.5); g.lineTo(W, l * cel + 0.5); g.stroke(); }
+  g.fillStyle = "rgba(255, 43, 214, 0.35)";
+  for (let c = 0; c <= COLS; c++) for (let l = 0; l <= LINHAS; l++) g.fillRect(c * cel - 1, l * cel - 1, 2, 2);
+  desenharCaminhos(g, jogo.mapa, cel, true);
+  // setas de entrada e a base no fim
+  jogo.caminhos.forEach(cam => {
+    const p = posNoCaminho(cam, 1.2);
+    g.save();
+    g.translate(p.x * cel, p.y * cel);
+    g.rotate(p.ang);
+    g.fillStyle = "rgba(255, 230, 0, 0.7)";
+    g.beginPath();
+    g.moveTo(cel * 0.25, 0); g.lineTo(-cel * 0.15, -cel * 0.2); g.lineTo(-cel * 0.15, cel * 0.2);
+    g.fill();
+    g.restore();
+  });
+  const fimCam = jogo.caminhos[0];
+  const pf = posNoCaminho(fimCam, fimCam.total - 1.5);
+  g.save();
+  g.shadowColor = "#ff2a4a"; g.shadowBlur = cel * 0.6;
+  g.strokeStyle = "#ff2a4a"; g.lineWidth = 3;
+  retArredondado(g, pf.x * cel - cel * 0.38, pf.y * cel - cel * 0.38, cel * 0.76, cel * 0.76, cel * 0.12);
+  g.stroke();
+  g.restore();
+  g.fillStyle = "#ff2a4a";
+  g.font = `900 ${Math.round(cel * 0.36)}px "Exo 2", sans-serif`;
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText("❤", pf.x * cel, pf.y * cel + 1);
+}
+
+function desenharTorre(g, tipo, px, py, s, ang, nivel) {
+  const b = TORRES[tipo], cor = b.cor;
+  g.save();
+  g.translate(px, py);
+  g.fillStyle = "#140c30";
+  g.strokeStyle = cor;
+  g.lineWidth = Math.max(1.5, s * 0.05);
+  retArredondado(g, -s * 0.4, -s * 0.4, s * 0.8, s * 0.8, s * 0.14);
+  g.fill(); g.stroke();
+  if (tipo === "gelo") {
+    // floco de neve que gira devagar
+    g.rotate(ang);
+    g.strokeStyle = cor; g.lineWidth = s * 0.07; g.lineCap = "round";
+    for (let i = 0; i < 3; i++) {
+      g.rotate(Math.PI / 3);
+      g.beginPath(); g.moveTo(-s * 0.28, 0); g.lineTo(s * 0.28, 0); g.stroke();
+    }
+    g.fillStyle = "#fff";
+    g.beginPath(); g.arc(0, 0, s * 0.09, 0, Math.PI * 2); g.fill();
+  } else if (tipo === "raio") {
+    g.fillStyle = "#2a2408";
+    g.beginPath(); g.moveTo(0, -s * 0.3); g.lineTo(s * 0.3, 0); g.lineTo(0, s * 0.3); g.lineTo(-s * 0.3, 0); g.closePath();
+    g.fill(); g.stroke();
+    g.fillStyle = cor;
+    g.beginPath();
+    g.moveTo(s * 0.06, -s * 0.22); g.lineTo(-s * 0.1, s * 0.03); g.lineTo(s * 0.02, s * 0.03);
+    g.lineTo(-s * 0.06, s * 0.22); g.lineTo(s * 0.11, -s * 0.04); g.lineTo(-s * 0.01, -s * 0.04);
+    g.closePath(); g.fill();
+  } else {
+    g.rotate(ang);
+    if (tipo === "laser") {
+      g.fillStyle = cor;
+      g.fillRect(0, -s * 0.06, s * 0.42, s * 0.12);
+      g.fillStyle = "#0d1f33";
+      g.beginPath(); g.arc(0, 0, s * 0.2, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = cor;
+      g.beginPath(); g.arc(0, 0, s * 0.08, 0, Math.PI * 2); g.fill();
+    } else if (tipo === "canhao") {
+      g.fillStyle = "#3a1440";
+      g.fillRect(0, -s * 0.12, s * 0.4, s * 0.24);
+      g.strokeRect(0, -s * 0.12, s * 0.4, s * 0.24);
+      g.fillStyle = "#3a1440";
+      g.beginPath(); g.arc(0, 0, s * 0.24, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = cor;
+      g.beginPath(); g.arc(0, 0, s * 0.1, 0, Math.PI * 2); g.fill();
+    } else if (tipo === "sniper") {
+      g.fillStyle = cor;
+      g.fillRect(0, -s * 0.035, s * 0.56, s * 0.07);
+      g.fillRect(s * 0.05, -s * 0.13, s * 0.18, s * 0.06);
+      g.fillStyle = "#0d2a1a";
+      g.beginPath(); g.arc(0, 0, s * 0.17, 0, Math.PI * 2); g.fill(); g.stroke();
+    }
+  }
+  g.restore();
+  for (let i = 0; i < nivel; i++) {
+    g.fillStyle = "#ffe600";
+    g.beginPath();
+    g.arc(px + (i - (nivel - 1) / 2) * s * 0.17, py + s * 0.3, s * 0.05, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+function caminhoForma(g, forma, r, ang, t) {
+  g.beginPath();
+  if (forma === "circulo") g.arc(0, 0, r, 0, Math.PI * 2);
+  else if (forma === "triangulo") {
+    for (let i = 0; i < 3; i++) {
+      const a = ang + i * Math.PI * 2 / 3;
+      const k = i === 0 ? 1.25 : 1;
+      g.lineTo(Math.cos(a) * r * k, Math.sin(a) * r * k);
+    }
+  } else if (forma === "quadrado") {
+    for (let i = 0; i < 4; i++) {
+      const a = ang + Math.PI / 4 + i * Math.PI / 2;
+      g.lineTo(Math.cos(a) * r * 1.25, Math.sin(a) * r * 1.25);
+    }
+  } else if (forma === "losango") {
+    g.moveTo(r * 1.2, 0); g.lineTo(0, r * 0.7); g.lineTo(-r * 1.2, 0); g.lineTo(0, -r * 0.7);
+  } else if (forma === "cruz") {
+    const a = r * 0.38;
+    g.moveTo(-a, -r); g.lineTo(a, -r); g.lineTo(a, -a); g.lineTo(r, -a); g.lineTo(r, a); g.lineTo(a, a);
+    g.lineTo(a, r); g.lineTo(-a, r); g.lineTo(-a, a); g.lineTo(-r, a); g.lineTo(-r, -a); g.lineTo(-a, -a);
+  } else if (forma === "hexagono") {
+    for (let i = 0; i < 6; i++) {
+      const a = t * 0.8 + i * Math.PI / 3;
+      g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+  }
+  g.closePath();
+}
+
+// ===== Estado do jogo =====
+let estado = "menu"; // menu | jogando | pausado | fim
+let jogo = null;
+let mapaEscolhido = "circuito", difEscolhida = "normal";
+let lojaSel = null, torreSel = null, autoOnda = false;
+const mouse = { c: -1, l: -1, dentro: false };
+let tempo = 0;
+
+function novoJogo() {
+  ctxAudio();
+  const mapa = MAPAS[mapaEscolhido], dif = DIFICULDADES[difEscolhida];
+  const ocupado = Array.from({ length: LINHAS }, () => new Array(COLS).fill(0));
+  mapa.caminhos.forEach(p => marcarCaminho(ocupado, p));
+  jogo = {
+    mapaId: mapaEscolhido, mapa, dif, ocupado,
+    caminhos: mapa.caminhos.map(prepararCaminho),
+    vidas: dif.vidas, dinheiro: mapa.dinheiro, onda: 0, emOnda: false,
+    fila: [], tempoSpawn: 0, intervalo: 1, proxCaminho: 0, tempoAuto: 0,
+    inimigos: [], torres: [], projeteis: [], efeitos: [], velocidade: 1,
+    abates: 0, construidas: 0, novoRecorde: false
+  };
+  lojaSel = null; torreSel = null;
+  estado = "jogando";
+  mostrarTela(null);
+  redimensionar();
+  atualizarVelocidade();
+  atualizarHUD();
+  atualizarPainel();
+  aviso("CONSTRUA TORRES E APERTE PRÓXIMA ONDA", 3500);
+  tocarMusica();
+}
+
+function mostrarTela(id) {
+  ["menu", "pausa", "fim"].forEach(t => document.getElementById(t).classList.toggle("escondida", t !== id));
+  document.getElementById("jogo").style.visibility = id === "menu" ? "hidden" : "";
+}
+
+let timerAviso = null;
+function aviso(texto, dur = 2000) {
+  const el = document.getElementById("aviso");
+  el.textContent = texto;
+  el.style.opacity = 1;
+  clearTimeout(timerAviso);
+  timerAviso = setTimeout(() => el.style.opacity = 0, dur);
+}
+
+function pausar() {
+  if (estado !== "jogando") return;
+  estado = "pausado";
+  pararMusica();
+  mostrarTela("pausa");
+}
+function continuar() {
+  if (estado !== "pausado") return;
+  estado = "jogando";
+  mostrarTela(null);
+  tocarMusica();
+}
+function irParaMenu() {
+  estado = "menu";
+  pararMusica();
+  montarMenu();
+  mostrarTela("menu");
+}
+
+// ===== Construir, melhorar, vender =====
+const livre = (c, l) => c >= 0 && c < COLS && l >= 0 && l < LINHAS && jogo.ocupado[l][c] === 0;
+
+function construir(tipo, c, l) {
+  const b = TORRES[tipo];
+  if (!livre(c, l)) { SONS.erro(); return; }
+  if (jogo.dinheiro < b.custo) { SONS.erro(); aviso("DINHEIRO INSUFICIENTE", 1200); return; }
+  jogo.dinheiro -= b.custo;
+  const t = { tipo, c, l, x: c + 0.5, y: l + 0.5, nivel: 1, cd: 0, ang: -Math.PI / 2, investido: b.custo, alvo: b.alvo || "primeiro", tiro: 0 };
+  jogo.torres.push(t);
+  jogo.ocupado[l][c] = t;
+  jogo.construidas++;
+  anel(t.x, t.y, 0.6, b.cor, 0.35);
+  SONS.construir();
+  atualizarHUD();
+}
+
+function melhorar(t) {
+  const custo = custoMelhoria(t);
+  if (custo === null) return;
+  if (jogo.dinheiro < custo) { SONS.erro(); aviso("DINHEIRO INSUFICIENTE", 1200); return; }
+  jogo.dinheiro -= custo;
+  t.investido += custo;
+  t.nivel++;
+  anel(t.x, t.y, 0.8, "#ffe600", 0.4);
+  SONS.melhorar();
+  atualizarHUD();
+  atualizarPainel();
+}
+
+function vender(t) {
+  const valor = valorVenda(t);
+  jogo.dinheiro += valor;
+  jogo.torres = jogo.torres.filter(x => x !== t);
+  jogo.ocupado[t.l][t.c] = 0;
+  texto(t.x, t.y, `+$${valor}`, "#ffe600");
+  SONS.vender();
+  torreSel = null;
+  atualizarHUD();
+  atualizarPainel();
+}
+
+function clicarCelula(c, l) {
+  if (!jogo || estado !== "jogando") return;
+  const o = c >= 0 && c < COLS && l >= 0 && l < LINHAS ? jogo.ocupado[l][c] : 1;
+  if (o && o !== 1) {           // clicou numa torre
+    torreSel = o === torreSel ? null : o;
+    lojaSel = null;
+    SONS.clique();
+  } else if (lojaSel) {
+    construir(lojaSel, c, l);
+  } else {
+    torreSel = null;
+  }
+  atualizarLoja();
+  atualizarPainel();
+}
+
+function escolherLoja(tipo) {
+  lojaSel = lojaSel === tipo ? null : tipo;
+  torreSel = null;
+  SONS.clique();
+  atualizarLoja();
+  atualizarPainel();
+}
+
+// ===== Ondas =====
+function proximaOnda() {
+  if (!jogo || jogo.emOnda || estado !== "jogando" || jogo.onda >= TOTAL_ONDAS) return;
+  jogo.onda++;
+  jogo.emOnda = true;
+  jogo.fila = montarOnda(jogo.onda);
+  jogo.tempoSpawn = 0;
+  jogo.intervalo = Math.max(0.3, 0.95 - jogo.onda * 0.022);
+  const chefe = jogo.onda % 10 === 0, enxame = jogo.onda % 5 === 0 && !chefe;
+  aviso(`ONDA ${jogo.onda}` + (chefe ? " — CHEFÃO!" : enxame ? " — ENXAME!" : ""), 2200);
+  if (chefe) SONS.chefe(); else SONS.onda();
+  atualizarHUD();
+}
+
+function fimDaOnda() {
+  jogo.emOnda = false;
+  const bonus = BALANCO.bonusBase + jogo.onda * BALANCO.bonusOnda;
+  jogo.dinheiro += bonus;
+  if (salvarRecorde(jogo.mapaId, jogo.onda)) jogo.novoRecorde = true;
+  if (jogo.onda >= TOTAL_ONDAS) return fimDeJogo(true);
+  aviso(`ONDA ${jogo.onda} COMPLETA!  +$${bonus}`, 2200);
+  SONS.fimOnda();
+  jogo.tempoAuto = 2.5;
+  atualizarHUD();
+}
+
+function fimDeJogo(venceu) {
+  estado = "fim";
+  pararMusica();
+  if (venceu) [523, 659, 784, 1047].forEach((f, i) => tom(f, 0.25, 0.08, "square", i * 0.15));
+  else [400, 300, 200, 120].forEach((f, i) => tom(f, 0.3, 0.08, "sawtooth", i * 0.18));
+  const titulo = document.getElementById("tituloFim");
+  titulo.textContent = venceu ? "VOCÊ DEFENDEU TUDO!" : "A BASE CAIU";
+  titulo.className = "titulo-fim " + (venceu ? "vitoria" : "derrota");
+  const ondasFeitas = venceu ? TOTAL_ONDAS : jogo.onda - 1;
+  document.getElementById("novoRecorde").textContent = jogo.novoRecorde ? "★ NOVO RECORDE NESTE MAPA ★" : "";
+  document.getElementById("resultado").innerHTML = `
+    <div><small>ONDAS SEGURADAS</small><b>${ondasFeitas} / ${TOTAL_ONDAS}</b></div>
+    <div><small>INIMIGOS DESTRUÍDOS</small><b>${jogo.abates}</b></div>
+    <div><small>TORRES CONSTRUÍDAS</small><b>${jogo.construidas}</b></div>
+    <div><small>RECORDE (${jogo.mapa.nome.toUpperCase()})</small><b>${lerRecorde(jogo.mapaId) >= TOTAL_ONDAS ? "VENCEU" : "onda " + lerRecorde(jogo.mapaId)}</b></div>`;
+  setTimeout(() => mostrarTela("fim"), venceu ? 600 : 900);
+}
+
+// ===== Efeitos =====
+function anel(x, y, r, cor, vida = 0.3) { jogo.efeitos.push({ tipo: "anel", x, y, r, cor, vida, max: vida }); }
+function linha(x1, y1, x2, y2, cor, largura, vida) { jogo.efeitos.push({ tipo: "linha", x1, y1, x2, y2, cor, largura, vida, max: vida }); }
+function texto(x, y, txt, cor) {
+  if (jogo.efeitos.length > 260) return;
+  jogo.efeitos.push({ tipo: "texto", x, y, txt, cor, vida: 0.8, max: 0.8 });
+}
+function particulas(x, y, cor, qtd) {
+  for (let i = 0; i < qtd && jogo.efeitos.length < 300; i++) {
+    const a = Math.random() * Math.PI * 2, v = 0.8 + Math.random() * 2;
+    jogo.efeitos.push({ tipo: "part", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, cor, vida: 0.4 + Math.random() * 0.3, max: 0.7 });
+  }
+}
+
+// ===== Simulação =====
+function criarInimigo(tipoId) {
+  const tipo = INIMIGOS[tipoId];
+  const cam = jogo.caminhos[jogo.proxCaminho++ % jogo.caminhos.length];
+  const vida = Math.round(tipo.vida * vidaDaOnda(jogo.onda) * jogo.dif.vida);
+  const p = posNoCaminho(cam, 0);
+  jogo.inimigos.push({ tipo, cam, vida, max: vida, d: 0, x: p.x, y: p.y, ang: p.ang, lento: 0, fatorLento: 1, flash: 0, curaT: 1, morto: false, fase: Math.random() * 6 });
+}
+
+function ferir(e, dano) {
+  if (e.morto) return;
+  const real = Math.max(dano * 0.3, dano - (e.tipo.armadura || 0));
+  e.vida -= real;
+  e.flash = 0.07;
+  if (e.vida <= 0) {
+    e.morto = true;
+    const premio = Math.max(1, Math.round(e.tipo.premio * BALANCO.premio));
+    jogo.dinheiro += premio;
+    jogo.abates++;
+    particulas(e.x, e.y, e.tipo.cor, e.tipo.chefe ? 30 : 8);
+    texto(e.x, e.y - 0.2, `+$${premio}`, "#ffe600");
+    if (e.tipo.chefe) { SONS.boom(); anel(e.x, e.y, 2, "#ff2a4a", 0.6); } else SONS.morte();
+  }
+}
+
+function deixarLento(e, fator, dur) {
+  if (e.tipo.chefe) fator = 1 - (1 - fator) * 0.5; // chefão resiste ao gelo
+  if (e.lento <= 0) e.fatorLento = 1;
+  e.fatorLento = Math.min(e.fatorLento, fator);
+  e.lento = Math.max(e.lento, dur);
+}
+
+function escolherAlvo(t, st) {
+  const soChao = TORRES[t.tipo].soChao;
+  let melhor = null, melhorV = -Infinity;
+  for (const e of jogo.inimigos) {
+    if (e.morto || (soChao && e.tipo.voa)) continue;
+    const d = Math.hypot(e.x - t.x, e.y - t.y);
+    if (d > st.alcance) continue;
+    const progresso = e.d / e.cam.total;
+    const v = t.alvo === "primeiro" ? progresso : t.alvo === "ultimo" ? -progresso : t.alvo === "forte" ? e.vida + progresso : -d;
+    if (v > melhorV) { melhorV = v; melhor = e; }
+  }
+  return melhor;
+}
+
+function atirar(t, e, st) {
+  const cor = TORRES[t.tipo].cor;
+  t.tiro = 0.1;
+  if (t.tipo === "laser") {
+    ferir(e, st.dano);
+    linha(t.x, t.y, e.x, e.y, cor, 2.5, 0.08);
+    SONS.laser();
+  } else if (t.tipo === "sniper") {
+    ferir(e, st.dano);
+    linha(t.x, t.y, e.x, e.y, cor, 3.5, 0.18);
+    particulas(e.x, e.y, cor, 4);
+    SONS.sniper();
+  } else if (t.tipo === "canhao") {
+    const sx = t.x + Math.cos(t.ang) * 0.4, sy = t.y + Math.sin(t.ang) * 0.4;
+    jogo.projeteis.push({ x: sx, y: sy, alvo: e, tx: e.x, ty: e.y, dano: st.dano, area: st.area, cor });
+    SONS.canhao();
+  } else if (t.tipo === "gelo") {
+    for (const o of jogo.inimigos) {
+      if (!o.morto && Math.hypot(o.x - e.x, o.y - e.y) <= st.area) {
+        ferir(o, st.dano);
+        deixarLento(o, st.lento, TORRES.gelo.tempoLento);
+      }
+    }
+    linha(t.x, t.y, e.x, e.y, cor, 2, 0.12);
+    anel(e.x, e.y, st.area, cor, 0.35);
+    SONS.gelo();
+  } else if (t.tipo === "raio") {
+    const atingidos = [e];
+    let atual = e, dano = st.dano;
+    linha(t.x, t.y, e.x, e.y, cor, 3, 0.15);
+    ferir(e, dano);
+    for (let k = 0; k < st.saltos; k++) {
+      let prox = null, menor = 1.7;
+      for (const o of jogo.inimigos) {
+        if (o.morto || atingidos.includes(o)) continue;
+        const d = Math.hypot(o.x - atual.x, o.y - atual.y);
+        if (d < menor) { menor = d; prox = o; }
+      }
+      if (!prox) break;
+      dano *= 0.8;
+      linha(atual.x, atual.y, prox.x, prox.y, cor, 2.5, 0.15);
+      ferir(prox, dano);
+      atingidos.push(prox);
+      atual = prox;
+    }
+    SONS.raio();
+  }
+}
+
+function atualizar(dt) {
+  tempo += dt;
+  // chegada de inimigos
+  if (jogo.emOnda && jogo.fila.length) {
+    jogo.tempoSpawn -= dt;
+    if (jogo.tempoSpawn <= 0) {
+      const tipo = jogo.fila.shift();
+      criarInimigo(tipo);
+      jogo.tempoSpawn = jogo.intervalo * (tipo === "chefe" ? 3 : 1);
+      if (jogo.fila[0] === "chefe") jogo.tempoSpawn += 1.5;
+    }
+  }
+
+  // inimigos andam
+  for (const e of jogo.inimigos) {
+    if (e.morto) continue;
+    e.flash -= dt;
+    if (e.lento > 0) e.lento -= dt;
+    const vel = e.tipo.vel * (e.lento > 0 ? e.fatorLento : 1);
+    e.d += vel * dt;
+    if (e.d >= e.cam.total) {
+      // chegou na base!
+      e.morto = true;
+      e.vazou = true;
+      jogo.vidas = Math.max(0, jogo.vidas - e.tipo.dano);
+      SONS.vazou();
+      const fl = document.getElementById("flash");
+      fl.style.transition = "none"; fl.style.opacity = 1;
+      requestAnimationFrame(() => { fl.style.transition = "opacity 0.5s"; fl.style.opacity = 0; });
+      atualizarHUD();
+      if (jogo.vidas <= 0) return fimDeJogo(false);
+      continue;
+    }
+    const p = posNoCaminho(e.cam, e.d);
+    e.x = p.x; e.y = p.y; e.ang = p.ang;
+    if (e.tipo.cura) {
+      e.curaT -= dt;
+      if (e.curaT <= 0) {
+        e.curaT = 1;
+        let curou = false;
+        for (const o of jogo.inimigos) {
+          if (o.morto || o === e || o.vida >= o.max) continue;
+          if (Math.hypot(o.x - e.x, o.y - e.y) < 1.6) { o.vida = Math.min(o.max, o.vida + o.max * 0.06 + 4); curou = true; }
+        }
+        if (curou) anel(e.x, e.y, 1.6, "#39ff88", 0.4);
+      }
+    }
+  }
+
+  // torres atiram
+  for (const t of jogo.torres) {
+    t.cd -= dt;
+    t.tiro = Math.max(0, t.tiro - dt);
+    if (t.tipo === "gelo") t.ang += dt * 0.8;
+    const st = stats(t);
+    const e = escolherAlvo(t, st);
+    if (!e) continue;
+    if (t.tipo !== "gelo") {
+      const alvoAng = Math.atan2(e.y - t.y, e.x - t.x);
+      let d = alvoAng - t.ang;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      t.ang += d * Math.min(1, dt * 18);
+    }
+    if (t.cd <= 0) { t.cd = st.cadencia; atirar(t, e, st); }
+  }
+
+  // balas do canhão
+  for (let i = jogo.projeteis.length - 1; i >= 0; i--) {
+    const p = jogo.projeteis[i];
+    if (!p.alvo.morto) { p.tx = p.alvo.x; p.ty = p.alvo.y; }
+    const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
+    const passo = 7 * dt;
+    if (d <= passo) {
+      for (const o of jogo.inimigos) {
+        if (!o.morto && !o.tipo.voa && Math.hypot(o.x - p.tx, o.y - p.ty) <= p.area) ferir(o, p.dano);
+      }
+      jogo.efeitos.push({ tipo: "boom", x: p.tx, y: p.ty, r: p.area, cor: p.cor, vida: 0.3, max: 0.3 });
+      particulas(p.tx, p.ty, "#ffb000", 5);
+      SONS.boom();
+      jogo.projeteis.splice(i, 1);
+    } else {
+      p.x += dx / d * passo;
+      p.y += dy / d * passo;
+    }
+  }
+
+  // efeitos
+  for (let i = jogo.efeitos.length - 1; i >= 0; i--) {
+    const f = jogo.efeitos[i];
+    f.vida -= dt;
+    if (f.tipo === "part") { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.92; f.vy *= 0.92; }
+    if (f.tipo === "texto") f.y -= dt * 0.6;
+    if (f.vida <= 0) jogo.efeitos.splice(i, 1);
+  }
+
+  const antes = jogo.inimigos.length;
+  jogo.inimigos = jogo.inimigos.filter(e => !e.morto);
+  if (jogo.inimigos.length !== antes) atualizarHUD();
+
+  if (jogo.emOnda && !jogo.fila.length && !jogo.inimigos.length) fimDaOnda();
+  else if (!jogo.emOnda && autoOnda && estado === "jogando") {
+    jogo.tempoAuto -= dt;
+    if (jogo.tempoAuto <= 0) proximaOnda();
+  }
+}
+
+// ===== Desenho =====
+function desenhar() {
+  const s = cel;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.drawImage(fundo, 0, 0, COLS * s, LINHAS * s);
+
+  // alcance da torre selecionada ou da que vai ser construída
+  const circuloAlcance = (x, y, r, cor, ok = true) => {
+    ctx.fillStyle = ok ? cor + "1a" : "rgba(255, 42, 74, 0.12)";
+    ctx.strokeStyle = ok ? cor + "aa" : "rgba(255, 42, 74, 0.7)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x * s, y * s, r * s, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  };
+  if (torreSel) {
+    circuloAlcance(torreSel.x, torreSel.y, stats(torreSel).alcance, TORRES[torreSel.tipo].cor);
+    ctx.strokeStyle = "#ffe600"; ctx.lineWidth = 2;
+    ctx.strokeRect(torreSel.c * s + 1, torreSel.l * s + 1, s - 2, s - 2);
+  }
+
+  for (const t of jogo.torres) {
+    const b = TORRES[t.tipo];
+    if (t.tiro > 0) {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = t.tiro * 6;
+      ctx.drawImage(brilho(b.cor), t.x * s - s * 0.7, t.y * s - s * 0.7, s * 1.4, s * 1.4);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+    }
+    desenharTorre(ctx, t.tipo, t.x * s, t.y * s, s, t.ang, t.nivel);
+  }
+
+  // inimigos: brilho embaixo, forma, barra de vida
+  ctx.globalCompositeOperation = "lighter";
+  for (const e of jogo.inimigos) {
+    const r = e.tipo.raio * s * 2.6;
+    const sobe = e.tipo.voa ? s * 0.18 : 0;
+    ctx.globalAlpha = 0.5;
+    ctx.drawImage(brilho(e.tipo.cor), e.x * s - r, e.y * s - sobe - r, r * 2, r * 2);
+  }
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+  for (const e of jogo.inimigos) {
+    const r = e.tipo.raio * s;
+    const px = e.x * s, py = e.y * s;
+    let sobe = 0;
+    if (e.tipo.voa) {
+      sobe = s * 0.18 + Math.sin(tempo * 6 + e.fase) * s * 0.04;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+      ctx.beginPath(); ctx.ellipse(px, py + r * 0.4, r * 0.9, r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.save();
+    ctx.translate(px, py - sobe);
+    caminhoForma(ctx, e.tipo.forma, r, e.ang, tempo);
+    ctx.fillStyle = e.flash > 0 ? "#ffffff" : e.tipo.cor;
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, s * 0.035);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.stroke();
+    // olhinhos
+    ctx.fillStyle = "#0b0820";
+    const ox = Math.cos(e.ang) * r * 0.35, oy = Math.sin(e.ang) * r * 0.35;
+    const lx = -Math.sin(e.ang) * r * 0.25, ly = Math.cos(e.ang) * r * 0.25;
+    ctx.beginPath();
+    ctx.arc(ox + lx, oy + ly, Math.max(1.2, r * 0.13), 0, Math.PI * 2);
+    ctx.arc(ox - lx, oy - ly, Math.max(1.2, r * 0.13), 0, Math.PI * 2);
+    ctx.fill();
+    if (e.tipo.voa) { // asinhas
+      ctx.strokeStyle = e.tipo.cor; ctx.lineWidth = Math.max(1, s * 0.04);
+      const bate = Math.sin(tempo * 18 + e.fase) * r * 0.3;
+      ctx.beginPath(); ctx.moveTo(-r * 0.2, -r * 0.5); ctx.lineTo(-r * 0.6, -r - bate);
+      ctx.moveTo(r * 0.2, -r * 0.5); ctx.lineTo(r * 0.6, -r - bate); ctx.stroke();
+    }
+    ctx.restore();
+    if (e.lento > 0) {
+      ctx.strokeStyle = "rgba(170, 220, 255, 0.85)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(px, py - sobe, r * 1.3, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (e.vida < e.max) {
+      const w = Math.max(s * 0.5, r * 2.2), h = Math.max(3, s * 0.07);
+      const x = px - w / 2, y = py - sobe - r - h - s * 0.08;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+      ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+      const k = Math.max(0, e.vida / e.max);
+      ctx.fillStyle = k > 0.5 ? "#39ff88" : k > 0.25 ? "#ffb000" : "#ff2a4a";
+      ctx.fillRect(x, y, w * k, h);
+    }
+  }
+
+  // balas do canhão
+  for (const p of jogo.projeteis) {
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(p.x * s, p.y * s, s * 0.08, 0, Math.PI * 2); ctx.fill();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.drawImage(brilho(p.cor), p.x * s - s * 0.25, p.y * s - s * 0.25, s * 0.5, s * 0.5);
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  // efeitos
+  for (const f of jogo.efeitos) {
+    const k = Math.max(0, f.vida / f.max);
+    if (f.tipo === "linha") {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = k;
+      ctx.strokeStyle = f.cor; ctx.lineWidth = f.largura * 2;
+      ctx.beginPath(); ctx.moveTo(f.x1 * s, f.y1 * s); ctx.lineTo(f.x2 * s, f.y2 * s); ctx.stroke();
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = f.largura * 0.6;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+    } else if (f.tipo === "anel") {
+      ctx.globalAlpha = k;
+      ctx.strokeStyle = f.cor; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(f.x * s, f.y * s, f.r * s * (0.4 + 0.6 * (1 - k)), 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else if (f.tipo === "boom") {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = k;
+      const r = f.r * s * (0.6 + 0.8 * (1 - k)) * 1.6;
+      ctx.drawImage(brilho("#ffb000"), f.x * s - r, f.y * s - r, r * 2, r * 2);
+      ctx.drawImage(brilho(f.cor), f.x * s - r * 0.7, f.y * s - r * 0.7, r * 1.4, r * 1.4);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+    } else if (f.tipo === "part") {
+      ctx.globalAlpha = k;
+      ctx.fillStyle = f.cor;
+      const t = Math.max(2, s * 0.07);
+      ctx.fillRect(f.x * s - t / 2, f.y * s - t / 2, t, t);
+      ctx.globalAlpha = 1;
+    } else if (f.tipo === "texto") {
+      ctx.globalAlpha = k;
+      ctx.fillStyle = f.cor;
+      ctx.font = `900 ${Math.max(10, Math.round(s * 0.3))}px "Exo 2", sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(f.txt, f.x * s, f.y * s);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // prévia da torre que vai ser construída
+  if (lojaSel && mouse.dentro && estado === "jogando") {
+    const ok = livre(mouse.c, mouse.l) && jogo.dinheiro >= TORRES[lojaSel].custo;
+    if (mouse.c >= 0 && mouse.c < COLS && mouse.l >= 0 && mouse.l < LINHAS) {
+      circuloAlcance(mouse.c + 0.5, mouse.l + 0.5, TORRES[lojaSel].alcance, TORRES[lojaSel].cor, ok);
+      ctx.globalAlpha = 0.6;
+      desenharTorre(ctx, lojaSel, (mouse.c + 0.5) * s, (mouse.l + 0.5) * s, s, -Math.PI / 2, 1);
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+// ===== HUD, loja e painel =====
+function atualizarHUD() {
+  if (!jogo) return;
+  document.getElementById("vidas").textContent = jogo.vidas;
+  document.getElementById("dinheiro").textContent = jogo.dinheiro;
+  document.getElementById("onda").textContent = jogo.onda;
+  document.getElementById("qtdInimigos").textContent = jogo.inimigos.length + jogo.fila.length;
+  const bo = document.getElementById("botaoOnda");
+  bo.disabled = jogo.emOnda || jogo.onda >= TOTAL_ONDAS;
+  bo.textContent = jogo.emOnda ? "ONDA EM ANDAMENTO…" : `ONDA ${jogo.onda + 1} ▶`;
+  atualizarLoja();
+  atualizarPainel(true);
+}
+
+function montarLoja() {
+  const loja = document.getElementById("loja");
+  loja.innerHTML = "";
+  ORDEM_TORRES.forEach((tipo, i) => {
+    const b = TORRES[tipo];
+    const el = document.createElement("button");
+    el.className = "item";
+    el.dataset.tipo = tipo;
+    const mini = document.createElement("canvas");
+    mini.width = mini.height = 40;
+    desenharTorre(mini.getContext("2d"), tipo, 20, 20, 36, -Math.PI / 4, 1);
+    el.append(mini);
+    el.insertAdjacentHTML("beforeend", `<i>${i + 1}</i><b>${b.nome}</b><span>$${b.custo}</span>`);
+    el.addEventListener("click", () => escolherLoja(tipo));
+    loja.append(el);
+  });
+}
+
+function atualizarLoja() {
+  document.querySelectorAll("#loja .item").forEach(el => {
+    el.classList.toggle("selecionado", el.dataset.tipo === lojaSel);
+    el.classList.toggle("caro", !!jogo && jogo.dinheiro < TORRES[el.dataset.tipo].custo);
+  });
+}
+
+// O painel mostra a torre escolhida na loja ou a torre clicada no mapa.
+// Os botões são criados uma vez por seleção; depois só os textos mudam (assim o clique não se perde).
+let painelDe = undefined;
+function atualizarPainel(soTextos) {
+  const p = document.getElementById("painel");
+  const chave = torreSel || lojaSel || null;
+  if (!soTextos || chave !== painelDe) {
+    painelDe = chave;
+    if (torreSel) {
+      p.innerHTML = `<h3 id="pNome"></h3><div class="stats" id="pStats"></div>
+        <div class="botoes"><button class="btn" id="pMelhorar"></button><button class="btn" id="pVender"></button><button class="btn" id="pAlvo"></button></div>`;
+      document.getElementById("pMelhorar").addEventListener("click", () => torreSel && melhorar(torreSel));
+      document.getElementById("pVender").addEventListener("click", () => torreSel && vender(torreSel));
+      document.getElementById("pAlvo").addEventListener("click", () => {
+        if (!torreSel) return;
+        torreSel.alvo = CICLO_ALVO[(CICLO_ALVO.indexOf(torreSel.alvo) + 1) % CICLO_ALVO.length];
+        SONS.clique();
+        atualizarPainel(true);
+      });
+    } else if (lojaSel) {
+      const b = TORRES[lojaSel];
+      p.innerHTML = `<h3>${b.nome}<small>$${b.custo}</small></h3><div>${b.desc}</div>
+        <div class="stats">Dano <b>${b.dano}</b> · Alcance <b>${b.alcance}</b> · Tiros/s <b>${(1 / b.cadencia).toFixed(1)}</b></div>
+        <div>Clique num espaço vazio para construir.</div>`;
+    } else {
+      p.innerHTML = `<h3>Loja de torres</h3><div>Escolha uma torre e clique num espaço vazio perto do caminho.
+        Clique numa torre pronta para <b>melhorar</b> ou <b>vender</b>.</div>`;
+    }
+  }
+  if (torreSel) {
+    const t = torreSel, b = TORRES[t.tipo], st = stats(t), custo = custoMelhoria(t);
+    document.getElementById("pNome").innerHTML = `${b.nome}<small>NÍVEL ${t.nivel}${t.nivel >= 3 ? " (MÁX)" : ""}</small>`;
+    let extra = "";
+    if (t.tipo === "gelo") extra = ` · Lentidão <b>${Math.round((1 - st.lento) * 100)}%</b>`;
+    if (t.tipo === "raio") extra = ` · Saltos <b>${st.saltos}</b>`;
+    if (t.tipo === "canhao") extra = ` · Área <b>${st.area.toFixed(1)}</b>`;
+    document.getElementById("pStats").innerHTML =
+      `Dano <b>${Math.round(st.dano)}</b> · Alcance <b>${st.alcance.toFixed(1)}</b> · Tiros/s <b>${(1 / st.cadencia).toFixed(1)}</b>${extra}`;
+    const bm = document.getElementById("pMelhorar");
+    bm.textContent = custo === null ? "NÍVEL MÁXIMO" : `⬆ MELHORAR $${custo} [U]`;
+    bm.disabled = custo === null || jogo.dinheiro < custo;
+    document.getElementById("pVender").textContent = `VENDER +$${valorVenda(t)} [V]`;
+    document.getElementById("pAlvo").textContent = `🎯 ${NOMES_ALVO[t.alvo]}`;
+  }
+}
+
+let velocidades = [1, 2, 3];
+function atualizarVelocidade() {
+  document.getElementById("botaoVelocidade").textContent = (jogo && jogo.velocidade > 1 ? "⏩ " : "▶ ") + (jogo ? jogo.velocidade : 1) + "x";
+}
+function trocarVelocidade() {
+  if (!jogo) return;
+  jogo.velocidade = velocidades[(velocidades.indexOf(jogo.velocidade) + 1) % velocidades.length];
+  atualizarVelocidade();
+  SONS.clique();
+}
+
+// ===== Menu =====
+function miniaturaMapa(mapa) {
+  const c = document.createElement("canvas");
+  c.width = 160; c.height = 100;
+  const g = c.getContext("2d");
+  g.fillStyle = "#0d0828";
+  g.fillRect(0, 0, 160, 100);
+  g.strokeStyle = "rgba(176, 107, 255, 0.15)";
+  for (let i = 0; i <= COLS; i++) { g.beginPath(); g.moveTo(i * 10 + 0.5, 0); g.lineTo(i * 10 + 0.5, 100); g.stroke(); }
+  for (let i = 0; i <= LINHAS; i++) { g.beginPath(); g.moveTo(0, i * 10 + 0.5); g.lineTo(160, i * 10 + 0.5); g.stroke(); }
+  desenharCaminhos(g, mapa, 10, false);
+  return c;
+}
+
+function montarMenu() {
+  const om = document.getElementById("opcoesMapa");
+  om.innerHTML = "";
+  Object.entries(MAPAS).forEach(([id, m]) => {
+    const el = document.createElement("button");
+    el.className = "opcao mapa" + (id === mapaEscolhido ? " selecionada" : "");
+    el.append(miniaturaMapa(m));
+    const rec = lerRecorde(id);
+    el.insertAdjacentHTML("beforeend", `${m.nome}<small>${m.desc}</small><span class="rec">${rec >= TOTAL_ONDAS ? "🏆 VENCIDO!" : rec ? "Recorde: onda " + rec : "Sem recorde"}</span>`);
+    el.addEventListener("click", () => { mapaEscolhido = id; ctxAudio(); SONS.clique(); montarMenu(); });
+    om.append(el);
+  });
+  const od = document.getElementById("opcoesDificuldade");
+  od.innerHTML = "";
+  Object.entries(DIFICULDADES).forEach(([id, d]) => {
+    const el = document.createElement("button");
+    el.className = "opcao" + (id === difEscolhida ? " selecionada" : "");
+    el.innerHTML = `${d.nome}<small>${d.desc}</small>`;
+    el.addEventListener("click", () => { difEscolhida = id; ctxAudio(); SONS.clique(); montarMenu(); });
+    od.append(el);
+  });
+}
+
+// ===== Controles =====
+function celulaDoEvento(e) {
+  const r = cv.getBoundingClientRect();
+  mouse.c = Math.floor((e.clientX - r.left) / cel);
+  mouse.l = Math.floor((e.clientY - r.top) / cel);
+}
+cv.addEventListener("pointermove", e => { celulaDoEvento(e); mouse.dentro = true; });
+cv.addEventListener("pointerleave", () => mouse.dentro = false);
+cv.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  celulaDoEvento(e);
+  mouse.dentro = e.pointerType === "mouse";
+  if (e.button === 2) { lojaSel = null; torreSel = null; atualizarLoja(); atualizarPainel(); return; }
+  clicarCelula(mouse.c, mouse.l);
+});
+cv.addEventListener("contextmenu", e => e.preventDefault());
+
+document.addEventListener("keydown", e => {
+  if (estado === "pausado" && (e.code === "KeyP" || e.code === "Escape")) return continuar();
+  if (estado !== "jogando") return;
+  const n = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5"].indexOf(e.code);
+  if (n >= 0) escolherLoja(ORDEM_TORRES[n]);
+  if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); proximaOnda(); }
+  if (e.code === "Escape") { lojaSel = null; torreSel = null; atualizarLoja(); atualizarPainel(); }
+  if (e.code === "KeyU" && torreSel) melhorar(torreSel);
+  if (e.code === "KeyV" && torreSel) vender(torreSel);
+  if (e.code === "KeyF") trocarVelocidade();
+  if (e.code === "KeyP") pausar();
+  if (e.code === "KeyM") alternarSom();
+});
+
+document.getElementById("botaoOnda").addEventListener("click", proximaOnda);
+document.getElementById("botaoVelocidade").addEventListener("click", trocarVelocidade);
+document.getElementById("botaoAuto").addEventListener("click", () => {
+  autoOnda = !autoOnda;
+  document.getElementById("botaoAuto").textContent = autoOnda ? "AUTO: SIM" : "AUTO: NÃO";
+  if (jogo) jogo.tempoAuto = 1.5;
+  SONS.clique();
+});
+document.getElementById("botaoSom").addEventListener("click", alternarSom);
+document.getElementById("botaoPausa").addEventListener("click", pausar);
+document.getElementById("botaoJogar").addEventListener("click", novoJogo);
+document.getElementById("botaoContinuar").addEventListener("click", continuar);
+document.getElementById("botaoMenuPausa").addEventListener("click", irParaMenu);
+document.getElementById("botaoDeNovo").addEventListener("click", novoJogo);
+document.getElementById("botaoMenuFim").addEventListener("click", irParaMenu);
+document.addEventListener("visibilitychange", () => { if (document.hidden) pausar(); });
+
+// ===== Laço principal =====
+let ultimoQuadro = performance.now();
+function laco(agora) {
+  requestAnimationFrame(laco);
+  const dt = Math.min(0.05, (agora - ultimoQuadro) / 1000);
+  ultimoQuadro = agora;
+  if (estado === "jogando") {
+    // em 2x e 3x roda vários passos pequenos (as balas não atravessam os inimigos)
+    let resta = dt * jogo.velocidade;
+    while (resta > 0 && estado === "jogando") {
+      const passo = Math.min(0.025, resta);
+      atualizar(passo);
+      resta -= passo;
+    }
+  }
+  if (jogo && fundo) desenhar();
+}
+
+document.getElementById("botaoSom").textContent = somLigado ? "🔊" : "🔇";
+montarLoja();
+montarMenu();
+mostrarTela("menu");
+atualizarPainel();
+requestAnimationFrame(laco);
+</script>
+</body>
+</html>
