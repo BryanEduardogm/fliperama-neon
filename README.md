@@ -8,13 +8,13 @@
 
 | Jogo | Estilo | Onde joga |
 |---|---|---|
-| Zona de Combate | Tiro em 1ª pessoa contra bots ou **X1 online com amigo** (6 mapas, 24 armas) | PC |
-| Punho Neon | Luta 2D com modo história e **online com amigo** | PC |
-| Turbo Neon | Corrida synthwave com 6 pistas e **online com até 4 pilotos** | PC |
-| Neon Morto | Terror num fliperama abandonado (4 mapas) | PC |
-| Mata Escura | Terror numa floresta à noite: 6 páginas e o Vulto | PC |
-| Ilha Perdida | Sobrevivência numa ilha com tubarões, pesca e jangada | PC |
-| Mundo de Blocos | Construção 3D | PC |
+| Zona de Combate | Tiro em 1ª pessoa contra bots ou **X1 online com amigo** (6 mapas, 24 armas) | PC + celular |
+| Punho Neon | Luta 2D com modo história e **online com amigo** | PC + celular |
+| Turbo Neon | Corrida synthwave com 6 pistas e **online com até 4 pilotos** | PC + celular |
+| Neon Morto | Terror num fliperama abandonado (4 mapas) | PC + celular |
+| Mata Escura | Terror numa floresta à noite: 6 páginas e o Vulto | PC + celular |
+| Ilha Perdida | Sobrevivência numa ilha com tubarões, pesca e jangada | PC + celular |
+| Mundo de Blocos | Construção 3D | PC + celular |
 | Defesa Neon | Estratégia (tower defense): 5 torres, 3 mapas, 30 ondas | PC + celular |
 | Batida Neon | Ritmo com músicas geradas pelo navegador | PC + celular |
 | Tetris Neon | Clássico | PC + celular |

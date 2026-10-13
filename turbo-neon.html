@@ -94,6 +94,30 @@
   .erro { color: #ff6a8a; font-weight: 700; min-height: 1.2em; }
   .opcao.usada { opacity: 0.25; cursor: not-allowed; }
   #dicaHud { position: absolute; left: 16px; bottom: 16px; font-size: 0.75rem; color: var(--suave); background: var(--painel); border-radius: 8px; padding: 6px 10px; }
+
+  /* ===== Controles de toque (celular) ===== */
+  #toque { position: fixed; inset: 0; z-index: 9; display: none; touch-action: none; -webkit-user-select: none; user-select: none; }
+  body.toque.em-jogo #toque { display: block; }
+  #toque .zona { position: absolute; top: 0; bottom: 0; touch-action: none; }
+  #toque .zona.esq { left: 0; width: 42%; }
+  #toque .zona.dir { right: 0; width: 58%; }
+  #toque .base { position: absolute; width: 124px; height: 124px; margin: -62px 0 0 -62px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.08); display: none; pointer-events: none; }
+  #toque .pino { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: rgba(255, 255, 255, 0.5); }
+  .btn-toque { position: absolute; width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.5); background: rgba(10, 10, 20, 0.42);
+    color: #fff; font: 800 11px/1.15 "Segoe UI", Arial, sans-serif; display: flex; align-items: center; justify-content: center; text-align: center;
+    touch-action: none; text-shadow: 0 1px 2px #000; }
+  .btn-toque.grande { width: 84px; height: 84px; font-size: 13px; }
+  .btn-toque.pequeno { width: 48px; height: 48px; font-size: 17px; }
+  .btn-toque.ativo { background: rgba(255, 255, 255, 0.4); transform: scale(0.94); }
+  #girar { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; text-align: center;
+    background: rgba(0, 0, 0, 0.93); color: #fff; font: 800 1.4rem/1.6 "Segoe UI", Arial, sans-serif; }
+  #girar small { font-size: 0.9rem; font-weight: 400; opacity: 0.7; }
+  @media (orientation: portrait) { body.toque.em-jogo #girar { display: flex; } }
+  body.toque #dicaHud { display: none; }
+  body.toque #caixaVel { right: auto; left: 16px; bottom: auto; top: 96px; min-width: 150px; }
+  body.toque #velocidade { font-size: 1.4rem; }
+  body.toque #minimapa { width: 120px; height: 120px; }
 </style>
 </head>
 <body>
@@ -341,7 +365,9 @@ document.querySelectorAll("#opcoesDif .opcao").forEach(b => b.addEventListener("
   difEscolhida = b.dataset.dif;
 }));
 if (matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches) {
-  document.getElementById("avisoPc").style.display = "block";
+  const aviso = document.getElementById("avisoPc");
+  aviso.textContent = "📱 No celular: use os botões na tela e deixe o celular deitado.";
+  aviso.style.display = "block";
 }
 
 // ===== Renderizador leve =====
@@ -1733,6 +1759,138 @@ function laco(agora) {
 desenharPistas();
 construirPista(PISTAS[pistaEscolhida]);
 requestAnimationFrame(laco);
+
+// ===== Controles de toque (celular e tablet) =====
+// No celular aparecem um analógico (lado esquerdo), uma área para olhar arrastando o dedo (lado direito) e botões.
+// Os botões "apertam" as mesmas teclas do teclado, então o jogo funciona do mesmo jeito.
+const TOQUE = matchMedia("(pointer: coarse)").matches && navigator.maxTouchPoints > 0;
+function teclaVirtual(code, baixo) {
+  document.dispatchEvent(new KeyboardEvent(baixo ? "keydown" : "keyup", { code, key: code, bubbles: true }));
+}
+// No celular, ao começar: tela cheia e tenta deixar deitado
+function telaCheiaDeitada() {
+  if (!TOQUE || document.fullscreenElement) return;
+  const el = document.documentElement, pedir = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!pedir) return;
+  try {
+    const p = pedir.call(el);
+    if (p && p.then) p.then(() => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(() => {}); }).catch(() => {});
+  } catch (e) {}
+}
+function montarToque(cfg) {
+  if (!TOQUE) return;
+  document.body.classList.add("toque");
+  // ao girar o celular ou entrar em tela cheia, o jogo se reajusta ao novo tamanho
+  const reajustar = () => setTimeout(() => dispatchEvent(new Event("resize")), 250);
+  addEventListener("orientationchange", reajustar);
+  document.addEventListener("fullscreenchange", reajustar);
+  const criar = (cls, pai) => { const d = document.createElement("div"); d.className = cls; pai.appendChild(d); return d; };
+  const raiz = document.createElement("div");
+  raiz.id = "toque";
+  document.body.appendChild(raiz);
+  const girar = document.createElement("div");
+  girar.id = "girar";
+  girar.innerHTML = "<div>📱 ↻<br>Gire o celular<br><small>o jogo fica melhor deitado</small></div>";
+  document.body.appendChild(girar);
+  const acharToque = (e, id) => [...e.changedTouches].find(t => t.identifier === id);
+
+  if (cfg.analogico) {
+    const zona = criar("zona esq", raiz), base = criar("base", raiz), pino = criar("pino", base);
+    let id = null, ox = 0, oy = 0;
+    const ligadas = {};
+    const ajustar = (code, on) => { if (!!ligadas[code] !== on) { ligadas[code] = on; teclaVirtual(code, on); } };
+    zona.addEventListener("touchstart", e => {
+      e.preventDefault();
+      if (id !== null) return;
+      const t = e.changedTouches[0];
+      id = t.identifier; ox = t.clientX; oy = t.clientY;
+      base.style.left = ox + "px"; base.style.top = oy + "px"; base.style.display = "block";
+      pino.style.transform = "";
+    }, { passive: false });
+    zona.addEventListener("touchmove", e => {
+      e.preventDefault();
+      const t = acharToque(e, id);
+      if (!t) return;
+      let dx = t.clientX - ox, dy = t.clientY - oy;
+      const dist = Math.hypot(dx, dy), max = 56;
+      if (dist > max) { dx *= max / dist; dy *= max / dist; }
+      pino.style.transform = `translate(${dx}px, ${dy}px)`;
+      const lim = 15;
+      ajustar("KeyW", dy < -lim); ajustar("KeyS", dy > lim);
+      ajustar("KeyA", dx < -lim); ajustar("KeyD", dx > lim);
+      if (cfg.correr) ajustar("ShiftLeft", dist > 54); // empurrar até o fim = correr
+    }, { passive: false });
+    const fim = e => {
+      if (!acharToque(e, id)) return;
+      id = null;
+      base.style.display = "none";
+      Object.keys(ligadas).forEach(c => ajustar(c, false));
+    };
+    zona.addEventListener("touchend", fim);
+    zona.addEventListener("touchcancel", fim);
+  }
+
+  if (cfg.olhar) {
+    const zona = criar("zona dir", raiz);
+    let id = null, ux = 0, uy = 0;
+    zona.addEventListener("touchstart", e => {
+      e.preventDefault();
+      if (id !== null) return;
+      const t = e.changedTouches[0];
+      id = t.identifier; ux = t.clientX; uy = t.clientY;
+    }, { passive: false });
+    zona.addEventListener("touchmove", e => {
+      e.preventDefault();
+      const t = acharToque(e, id);
+      if (!t) return;
+      cfg.olhar(t.clientX - ux, t.clientY - uy);
+      ux = t.clientX; uy = t.clientY;
+    }, { passive: false });
+    const fim = e => { if (acharToque(e, id)) id = null; };
+    zona.addEventListener("touchend", fim);
+    zona.addEventListener("touchcancel", fim);
+  }
+
+  for (const b of cfg.botoes || []) {
+    const el = criar("btn-toque " + (b.tamanho || ""), raiz);
+    el.innerHTML = b.rotulo;
+    Object.assign(el.style, b.pos);
+    el.addEventListener("touchstart", e => {
+      e.preventDefault(); e.stopPropagation();
+      el.classList.add("ativo");
+      if (b.tecla) teclaVirtual(b.tecla, true);
+      if (b.aoApertar) b.aoApertar();
+    }, { passive: false });
+    const soltar = e => {
+      e.preventDefault();
+      el.classList.remove("ativo");
+      if (b.tecla) teclaVirtual(b.tecla, false);
+      if (b.aoSoltar) b.aoSoltar();
+    };
+    el.addEventListener("touchend", soltar);
+    el.addEventListener("touchcancel", soltar);
+  }
+
+  // os controles só aparecem durante a partida
+  (function vigiar() { document.body.classList.toggle("em-jogo", !!cfg.ativo()); requestAnimationFrame(vigiar); })();
+  (cfg.telaCheia || []).forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener("click", telaCheiaDeitada); });
+}
+
+montarToque({
+  ativo: () => estado === "correndo" || estado === "contagem",
+  telaCheia: ["botaoCorrer", "botaoDeNovo", "botaoCriarSala", "botaoEntrarSala"],
+  botoes: [
+    { rotulo: "◀", tecla: "ArrowLeft", tamanho: "grande", pos: { left: "18px", bottom: "22px" } },
+    { rotulo: "▶", tecla: "ArrowRight", tamanho: "grande", pos: { left: "114px", bottom: "22px" } },
+    { rotulo: "↺", tecla: "KeyR", tamanho: "pequeno", pos: { left: "26px", bottom: "124px" } },
+    { rotulo: "📷", tecla: "KeyC", tamanho: "pequeno", pos: { left: "88px", bottom: "124px" } },
+    { rotulo: "ACELERAR", tecla: "ArrowUp", tamanho: "grande", pos: { right: "18px", bottom: "22px" } },
+    { rotulo: "FREIO", tecla: "ArrowDown", pos: { right: "116px", bottom: "16px" } },
+    { rotulo: "NITRO", tecla: "ShiftLeft", pos: { right: "28px", bottom: "122px" } },
+    { rotulo: "DRIFT", tecla: "Space", pos: { right: "110px", bottom: "96px" } },
+    { rotulo: "⏸", tecla: "KeyP", tamanho: "pequeno", pos: { right: "150px", top: "16px" } }
+  ]
+});
 </script>
 </body>
 </html>
